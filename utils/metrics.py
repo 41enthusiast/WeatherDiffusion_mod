@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import torch
+# import torch
 
 # This script is adapted from the following repository: https://github.com/JingyunLiang/SwinIR
 
