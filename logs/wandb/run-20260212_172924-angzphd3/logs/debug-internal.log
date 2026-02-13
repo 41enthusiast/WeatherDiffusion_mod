@@ -1,0 +1,10 @@
+{"time":"2026-02-12T17:29:24.664931959-08:00","level":"INFO","msg":"stream: starting","core version":"0.23.1"}
+{"time":"2026-02-12T17:29:25.005858976-08:00","level":"INFO","msg":"stream: created new stream","id":"angzphd3"}
+{"time":"2026-02-12T17:29:25.006749518-08:00","level":"INFO","msg":"handler: started","stream_id":"angzphd3"}
+{"time":"2026-02-12T17:29:25.014983199-08:00","level":"INFO","msg":"stream: started","id":"angzphd3"}
+{"time":"2026-02-12T17:29:25.015048007-08:00","level":"INFO","msg":"writer: started","stream_id":"angzphd3"}
+{"time":"2026-02-12T17:29:25.015063132-08:00","level":"INFO","msg":"sender: started","stream_id":"angzphd3"}
+{"time":"2026-02-12T17:29:25.603013314-08:00","level":"ERROR","msg":"git repo not found","error":"repository does not exist"}
+{"time":"2026-02-12T17:30:30.08236369-08:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/files/mridulav/wd_mod/angzphd3/file_stream\": dial tcp: lookup api.wandb.ai on 172.28.192.1:53: read udp 172.28.196.174:44364->172.28.192.1:53: i/o timeout"}
+{"time":"2026-02-12T17:30:42.794688717-08:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/files/mridulav/wd_mod/angzphd3/file_stream\": dial tcp: lookup api.wandb.ai on 172.28.192.1:53: read udp 172.28.196.174:42661->172.28.192.1:53: i/o timeout"}
+{"time":"2026-02-12T17:31:00.668256216-08:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/files/mridulav/wd_mod/angzphd3/file_stream\": dial tcp: lookup api.wandb.ai on 172.28.192.1:53: read udp 172.28.196.174:60299->172.28.192.1:53: i/o timeout"}

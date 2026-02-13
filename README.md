@@ -32,14 +32,13 @@ We also share our pre-trained diffusive multi-weather restoration model [Weather
 
 To evaluate WeatherDiff<sub>64</sub> using the pre-trained model checkpoint with the current version of the repository:
 ```bash
-python eval_diffusion.py --config "allweather.yml" --resume 'WeatherDiff64.pth.tar' --test_set 'raindrop' --sampling_timesteps 25 --grid_r 16
-python eval_diffusion.py --config "allweather.yml" --resume 'WeatherDiff64.pth.tar' --test_set 'rainfog' --sampling_timesteps 25 --grid_r 16
 python eval_diffusion.py --config "allweather.yml" --resume 'WeatherDiff64.pth.tar' --test_set 'snow' --sampling_timesteps 25 --grid_r 16
 ```
 
-
-
-
+To train the WeatherDiff<sub>64</sub> from scratch:
+```bash
+python train_diffusion.py --config art_painting.yml
+```
 
 ## Reference
 Adapted the code from the paper:

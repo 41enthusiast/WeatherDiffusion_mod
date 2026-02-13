@@ -1,0 +1,73 @@
+_wandb:
+    value:
+        cli_version: 0.23.1
+        code_path: code/train_diffusion.py
+        e:
+            isbb8x02efmc5wkf74u92m0c2eoapvch:
+                args:
+                    - --config
+                    - art_painting.yml
+                codePath: train_diffusion.py
+                codePathLocal: train_diffusion.py
+                cpu_count: 6
+                cpu_count_logical: 12
+                cudaVersion: "13.1"
+                disk:
+                    /:
+                        total: "1081101176832"
+                        used: "60836646912"
+                email: txlx81@durham.ac.uk
+                executable: /home/mridulav/miniconda3/envs/unet_tests/bin/python
+                git:
+                    commit: cf043a72592260289e31f682d93dbd3e43bb56c7
+                    remote: https://github.com/41enthusiast/WeatherDiffusion_mod.git
+                gpu: NVIDIA GeForce GTX 1650 Ti
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Turing
+                      memoryTotal: "4294967296"
+                      name: NVIDIA GeForce GTX 1650 Ti
+                      uuid: GPU-7a5c7974-97f9-5d6f-c234-9c49d9e11ed7
+                host: DESKTOP-5M05SI6
+                memory:
+                    total: "8255651840"
+                os: Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39
+                program: /mnt/c/Users/mridulav/Documents/code_repos/WeatherDiffusion_mod/train_diffusion.py
+                python: CPython 3.11.14
+                root: logs
+                startedAt: "2026-02-13T01:09:43.603888Z"
+                writerId: isbb8x02efmc5wkf74u92m0c2eoapvch
+        m:
+            - "1": trainer/global_step
+              "6":
+                - 3
+              "7": []
+            - "2": '*'
+              "5": 1
+              "6":
+                - 1
+              "7": []
+        python_version: 3.11.14
+        t:
+            "1":
+                - 1
+                - 9
+                - 41
+                - 51
+                - 103
+                - 105
+            "2":
+                - 1
+                - 9
+                - 41
+                - 51
+                - 103
+                - 105
+            "3":
+                - 7
+                - 13
+                - 66
+            "4": 3.11.14
+            "5": 0.23.1
+            "12": 0.23.1
+            "13": linux-x86_64

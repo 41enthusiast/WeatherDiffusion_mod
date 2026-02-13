@@ -1,0 +1,12 @@
+{"time":"2026-02-12T16:55:34.089694455-08:00","level":"INFO","msg":"stream: starting","core version":"0.23.1"}
+{"time":"2026-02-12T16:55:34.442421137-08:00","level":"INFO","msg":"stream: created new stream","id":"efhz118i"}
+{"time":"2026-02-12T16:55:34.443836287-08:00","level":"INFO","msg":"handler: started","stream_id":"efhz118i"}
+{"time":"2026-02-12T16:55:34.45143023-08:00","level":"INFO","msg":"stream: started","id":"efhz118i"}
+{"time":"2026-02-12T16:55:34.45146103-08:00","level":"INFO","msg":"writer: started","stream_id":"efhz118i"}
+{"time":"2026-02-12T16:55:34.451485505-08:00","level":"INFO","msg":"sender: started","stream_id":"efhz118i"}
+{"time":"2026-02-12T16:55:34.93149641-08:00","level":"ERROR","msg":"git repo not found","error":"repository does not exist"}
+{"time":"2026-02-12T16:55:38.395846432-08:00","level":"INFO","msg":"stream: closing","id":"efhz118i"}
+{"time":"2026-02-12T16:55:38.951801254-08:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2026-02-12T16:55:39.214820725-08:00","level":"INFO","msg":"handler: closed","stream_id":"efhz118i"}
+{"time":"2026-02-12T16:55:39.219019609-08:00","level":"INFO","msg":"sender: closed","stream_id":"efhz118i"}
+{"time":"2026-02-12T16:55:39.219207343-08:00","level":"INFO","msg":"stream: closed","id":"efhz118i"}

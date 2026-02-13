@@ -1,0 +1,43 @@
+{
+  "os":  "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+  "python":  "CPython 3.11.14",
+  "startedAt":  "2026-02-13T01:06:08.915394Z",
+  "args":  [
+    "--config",
+    "art_painting.yml"
+  ],
+  "program":  "/mnt/c/Users/mridulav/Documents/code_repos/WeatherDiffusion_mod/train_diffusion.py",
+  "codePath":  "train_diffusion.py",
+  "codePathLocal":  "train_diffusion.py",
+  "git":  {
+    "remote":  "https://github.com/41enthusiast/WeatherDiffusion_mod.git",
+    "commit":  "cf043a72592260289e31f682d93dbd3e43bb56c7"
+  },
+  "email":  "txlx81@durham.ac.uk",
+  "root":  "logs",
+  "host":  "DESKTOP-5M05SI6",
+  "executable":  "/home/mridulav/miniconda3/envs/unet_tests/bin/python",
+  "cpu_count":  6,
+  "cpu_count_logical":  12,
+  "gpu":  "NVIDIA GeForce GTX 1650 Ti",
+  "gpu_count":  1,
+  "disk":  {
+    "/":  {
+      "total":  "1081101176832",
+      "used":  "60836634624"
+    }
+  },
+  "memory":  {
+    "total":  "8255651840"
+  },
+  "gpu_nvidia":  [
+    {
+      "name":  "NVIDIA GeForce GTX 1650 Ti",
+      "memoryTotal":  "4294967296",
+      "architecture":  "Turing",
+      "uuid":  "GPU-7a5c7974-97f9-5d6f-c234-9c49d9e11ed7"
+    }
+  ],
+  "cudaVersion":  "13.1",
+  "writerId":  "b3meme8mo7p93r8mrs4vm12jgoxru0mn"
+}

@@ -1,0 +1,12 @@
+{"time":"2026-02-12T17:03:20.989438253-08:00","level":"INFO","msg":"stream: starting","core version":"0.23.1"}
+{"time":"2026-02-12T17:03:21.39121336-08:00","level":"INFO","msg":"stream: created new stream","id":"noped3d1"}
+{"time":"2026-02-12T17:03:21.391885185-08:00","level":"INFO","msg":"handler: started","stream_id":"noped3d1"}
+{"time":"2026-02-12T17:03:21.39473006-08:00","level":"INFO","msg":"stream: started","id":"noped3d1"}
+{"time":"2026-02-12T17:03:21.394805318-08:00","level":"INFO","msg":"writer: started","stream_id":"noped3d1"}
+{"time":"2026-02-12T17:03:21.394844551-08:00","level":"INFO","msg":"sender: started","stream_id":"noped3d1"}
+{"time":"2026-02-12T17:03:21.922404205-08:00","level":"ERROR","msg":"git repo not found","error":"repository does not exist"}
+{"time":"2026-02-12T17:03:25.059725599-08:00","level":"INFO","msg":"stream: closing","id":"noped3d1"}
+{"time":"2026-02-12T17:03:25.57422816-08:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2026-02-12T17:03:25.944746124-08:00","level":"INFO","msg":"handler: closed","stream_id":"noped3d1"}
+{"time":"2026-02-12T17:03:25.961147675-08:00","level":"INFO","msg":"sender: closed","stream_id":"noped3d1"}
+{"time":"2026-02-12T17:03:25.961572916-08:00","level":"INFO","msg":"stream: closed","id":"noped3d1"}

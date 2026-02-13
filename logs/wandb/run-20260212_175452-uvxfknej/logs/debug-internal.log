@@ -1,0 +1,8 @@
+{"time":"2026-02-12T17:54:53.171926619-08:00","level":"INFO","msg":"stream: starting","core version":"0.23.1"}
+{"time":"2026-02-12T17:54:53.514622676-08:00","level":"INFO","msg":"stream: created new stream","id":"uvxfknej"}
+{"time":"2026-02-12T17:54:53.5154331-08:00","level":"INFO","msg":"handler: started","stream_id":"uvxfknej"}
+{"time":"2026-02-12T17:54:53.518246714-08:00","level":"INFO","msg":"stream: started","id":"uvxfknej"}
+{"time":"2026-02-12T17:54:53.518360656-08:00","level":"INFO","msg":"writer: started","stream_id":"uvxfknej"}
+{"time":"2026-02-12T17:54:53.518392831-08:00","level":"INFO","msg":"sender: started","stream_id":"uvxfknej"}
+{"time":"2026-02-12T17:54:53.891853933-08:00","level":"ERROR","msg":"git repo not found","error":"repository does not exist"}
+{"time":"2026-02-12T18:13:53.017202909-08:00","level":"INFO","msg":"api: retrying HTTP error","status":502,"url":"https://api.wandb.ai/files/mridulav/wd_mod/uvxfknej/file_stream","body":"\n<html><head>\n<meta http-equiv=\"content-type\" content=\"text/html;charset=utf-8\">\n<title>502 Server Error</title>\n</head>\n<body text=#000000 bgcolor=#ffffff>\n<h1>Error: Server Error</h1>\n<h2>The server encountered a temporary error and could not complete your request.<p>Please try again in 30 seconds.</h2>\n<h2></h2>\n</body></html>\n"}

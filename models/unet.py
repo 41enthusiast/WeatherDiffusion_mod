@@ -50,7 +50,7 @@ class Upsample(nn.Module):
 
     def forward(self, x):
         x = torch.nn.functional.interpolate(
-            x, scale_factor=2.0, mode="nearest")
+            x, scale_factor=2.0, mode="nearest")# TO MOD to Upsample2D
         if self.with_conv:
             x = self.conv(x)
         return x
@@ -201,8 +201,9 @@ class DiffusionUNet(nn.Module):
         num_res_blocks = config.model.num_res_blocks
         attn_resolutions = config.model.attn_resolutions
         dropout = config.model.dropout
-        in_channels = config.model.in_channels * 2 if config.data.conditional else config.model.in_channels
-        resolution = config.data.image_size
+        #modded
+        in_channels = config.model.in_channels * 2 + 1 if config.data.conditional else config.model.in_channels
+        resolution = config.data.patch_size
         resamp_with_conv = config.model.resamp_with_conv
 
         self.ch = ch

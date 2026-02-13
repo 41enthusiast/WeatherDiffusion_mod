@@ -1,0 +1,16 @@
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+/home/mridulav/miniconda3/envs/unet_tests/lib/python3.11/site-packages/pytorch_lightning/utilities/model_summary/model_summary.py:242: Precision bf16-mixed is not supported by the model summary.  Estimated model size in MB will not be accurate. Using 32 bits instead.
+┏━━━┳━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━┓
+┃[1;35m [0m[1;35m [0m[1;35m [0m┃[1;35m [0m[1;35mName [0m[1;35m [0m┃[1;35m [0m[1;35mType         [0m[1;35m [0m┃[1;35m [0m[1;35mParams[0m[1;35m [0m┃[1;35m [0m[1;35mMode [0m[1;35m [0m┃[1;35m [0m[1;35mFLOPs[0m[1;35m [0m┃
+┡━━━╇━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━┩
+│[2m [0m[2m0[0m[2m [0m│ model │ DiffusionUNet │ 83.0 M │ train │     0 │
+└───┴───────┴───────────────┴────────┴───────┴───────┘
+[1mTrainable params[0m: 83.0 M
+[1mNon-trainable params[0m: 0
+[1mTotal params[0m: 83.0 M
+[1mTotal estimated model params size (MB)[0m: 331
+[1mModules in train mode[0m: 252
+[1mModules in eval mode[0m: 0
+[1mTotal FLOPs[0m: 0
+[2Ktorch.float32 torch.float32 torch.int64━━━━━━━━━━━━━━━━━━━━━━━━━[0m 0/2250 [2m0:00:00 • -:--:--[0m [2;4m0.00it/s[0m [3m [0m
+Epoch 0/1774 [38;5;237m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m 0/2250 [2m0:00:00 • -:--:--[0m [2;4m0.00it/s[0m [3m [0m

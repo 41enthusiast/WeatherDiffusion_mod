@@ -13,6 +13,9 @@ import numpy as np
 from models.unet import DiffusionUNet
 from torchvision.transforms.functional import crop
 from torch import nn
+from matplotlib import plt
+from torchvision.transforms.functional import to_pil_image, to_tensor
+from PIL import Image
 
 class EMAHelper(object):
     def __init__(self, mu=0.9999):
@@ -128,15 +131,13 @@ def generalized_steps_overlapping(x, x_cond, seq, model, b, x_grid_mask, eta=0.,
             
             manual_batching_size = 64
             xt_patch = torch.cat([crop(xt, hi, wi, p_size, p_size) for (hi, wi) in corners], dim=0)
-            x_cond_patch = torch.cat([data_transform(crop(x_cond, hi, wi, p_size, p_size)) for (hi, wi) in corners], dim=0)
+            x_cond_patch = torch.cat([data_transform(crop(x_cond, hi, wi, p_size, p_size)) for (hi, wi) in corners], dim=0).to(x.device)
+            # print(x_cond_patch.device, xt_patch.device)
             for i in range(0, len(corners), manual_batching_size):
                 outputs = model(torch.cat([x_cond_patch[i:i+manual_batching_size], 
                                             xt_patch[i:i+manual_batching_size]], dim=1), t)
                 for idx, (hi, wi) in enumerate(corners[i:i+manual_batching_size]):
-                    et_output[0, :, hi:hi + p_size, wi:wi + p_size] += outputs[idx]
-                    current_grid = torch.div(et_output, x_grid_mask)
-                    yield f"Step {i}: Filling Patches...", inverse_data_transform(current_grid), gr.update(), gr.update() # flag as intermediate step patch filling
-                    
+                    et_output[0, :, hi:hi + p_size, wi:wi + p_size] += outputs[idx]  
             et = torch.div(et_output, x_grid_mask)
             x0_t = (xt - et * (1 - at).sqrt()) / at.sqrt()
             x0_preds.append(x0_t.to('cpu'))
@@ -144,8 +145,6 @@ def generalized_steps_overlapping(x, x_cond, seq, model, b, x_grid_mask, eta=0.,
             c1 = eta * ((1 - at / at_next) * (1 - at_next) / (1 - at)).sqrt()
             c2 = ((1 - at_next) - c1 ** 2).sqrt()
             xt_next = at_next.sqrt() * x0_t + c1 * torch.randn_like(x) + c2 * et
-            step_img = inverse_data_transform(xt_next.to('cpu'))
-            yield f"Completed Step {i}", gr.update(value=None), step_img, gr.update() #to display current denoising step number and intermediate output
             xs.append(xt_next.to('cpu'))
     return xs#, x0_preds
 
@@ -157,7 +156,7 @@ def unwrap_modelckpt(state_dict):
         new_state_dict[name] = v
     return new_state_dict
 
-def main():
+def main(masked_img):
     # set random seed
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -165,7 +164,6 @@ def main():
         torch.cuda.manual_seed_all(args.seed)
     torch.backends.cudnn.benchmark = True
 
-    masked_img = torch.rand(3, 256, 256, device = device)
     masked_img.unsqueeze_(0)#dim will be 4 here - evaluation phase
     # diffusion = DenoisingDiffusion(args, config)
     checkpoint = torch.load(args.resume)#, map_location=device)
@@ -174,16 +172,16 @@ def main():
     ema_helper = EMAHelper()
     ema_helper.register(model)
 
-    model_ckpt = unwrap_modelckpt(checkpoint['state_dict'])
-    model.load_state_dict(model_ckpt)
+    # model_ckpt = unwrap_modelckpt(checkpoint['state_dict'])
+    # model.load_state_dict(model_ckpt)
     ema_helper.load_state_dict(checkpoint['ema_helper'])
     ema_helper.ema(model)
-    model.eval()
+    # model.eval()
     # diffusion.load_ddm_ckpt(, ema=True)
     # diffusion.model.eval()
     r = args.grid_r
     p_size = config.data.image_size
-    x_rand = torch.rand(masked_img.size(), device = diffusion.device)
+    x_rand = torch.randn(masked_img.size(), device = config.device)
     h_list, w_list = overlapping_grid_indices(masked_img, p_size, r)
     corners = [(i,j) for i in h_list for j in w_list]
     print('Number of patches', len(corners))
@@ -198,6 +196,7 @@ def main():
         x_grid_mask[:, :, hi:hi + p_size, wi:wi + p_size] += 1 
     xs = generalized_steps_overlapping(x_rand, masked_img, seq, model, betas, x_grid_mask, eta=0.,
                                                             corners=corners, p_size=p_size)[-1]
+    print('Xs range', xs.min(), xs.max())
     return inverse_data_transform(xs)
 
 if __name__ == '__main__':
@@ -206,6 +205,10 @@ if __name__ == '__main__':
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     print("Using device: {}".format(device))
     config.device = device
-    results = main()
-    # from matplotlib import plt
-    # plt.imshow(results.permute(0,1,2))
+    img_file = '../snow100k/test_a/input/25_rain.png'
+    masked_img = Image.open(img_file).convert('RGB')
+    masked_tensor = to_tensor(masked_img)
+    result = main(masked_tensor)
+    print(result.shape, result.min(), result.max())
+    result = to_pil_image(result.squeeze().cpu())
+    plt.imshow(result.permute(0,1,2))
