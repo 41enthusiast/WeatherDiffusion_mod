@@ -1,6 +1,6 @@
 data:
     dataset: "AllWeather"
-    image_size: 64
+    patch_size: 64
     channels: 3
     num_workers: 32
     data_dir: "/scratch/ozan/"

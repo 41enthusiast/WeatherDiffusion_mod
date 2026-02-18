@@ -202,7 +202,7 @@ class DiffusionUNet(nn.Module):
         attn_resolutions = config.model.attn_resolutions
         dropout = config.model.dropout
         #modded
-        in_channels = config.model.in_channels * 2 + 1 if config.data.conditional else config.model.in_channels
+        in_channels = config.model.in_channels +3 if config.data.conditional else config.model.in_channels
         resolution = config.data.patch_size
         resamp_with_conv = config.model.resamp_with_conv
 

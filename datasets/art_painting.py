@@ -83,8 +83,9 @@ def visualize_batch(dataloader, num_samples=4):
         axes[i, 2].set_title("Ground Truth", fontsize=10)
         axes[i, 2].axis('off')
 
+    plt.savefig('art_dataset1patch.png', bbox_inches = 'tight')
     plt.show()
-
+    
 class ArtPaintingDataset(Dataset):
     def __init__(self, images_dir: str, mask_dir: str, patch_size, n, transforms,
                  scale: float = 1.0, img_size=None, mask_suffix: str = '', split = 'train',

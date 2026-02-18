@@ -37,7 +37,7 @@ diffusion:
 
 training:
     patch_n: 16
-    batch_size: 1
+    batch_size: 4
     n_epochs: 1775
     n_iters: 2000000
     snapshot_freq: 10000
