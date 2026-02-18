@@ -28,7 +28,8 @@ def unwrap_modelckpt(state_dict):
     from collections import OrderedDict
     new_state_dict = OrderedDict()
     for k, v in state_dict.items():
-        name = k[6:] if k.startswith('model.') else k # remove 'module.'
+        name = k[7:] if k.startswith('module.') else k # remove 'module.'
+        # name = k[6:] if k.startswith('model.') else k # remove 'module.'
         new_state_dict[name] = v
     return new_state_dict
 

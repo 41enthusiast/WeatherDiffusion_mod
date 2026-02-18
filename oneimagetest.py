@@ -114,7 +114,8 @@ def generalized_steps_overlapping(x, x_cond, masked_tensor, mask_tensor, seq, mo
         x0_preds = []
         xs = [x]
         gif_frames = []
-        mask_tensor = mask_tensor.to(x.device)
+        if mask_tensor is not None:
+            mask_tensor = mask_tensor.to(x.device)
         masked_tensor = masked_tensor.to(x.device)
 
         for i, j in tqdm(zip(reversed(seq), reversed(seq_next)), total=len(seq), desc="Denoising Steps"):
@@ -148,8 +149,9 @@ def generalized_steps_overlapping(x, x_cond, masked_tensor, mask_tensor, seq, mo
             c2 = ((1 - at_next) - c1 ** 2).sqrt()
             xt_next = at_next.sqrt() * x0_t + c1 * torch.randn_like(x) + c2 * et
             # xs.append(xt_next.to('cpu'))
-            xs = [xt_next*(1-mask_tensor) + (mask_tensor)*masked_tensor]#to reuse good parts of the image
-
+            # xs = [xt_next*(1-mask_tensor) + (mask_tensor)*masked_tensor]#to reuse good parts of the image
+            xs = [xt_next]#original no reuse
+            assert xt_next.max() <=20, "Exploding values, something is wrong at"+i
             # --- GIF LOGIC ---
             # Convert the current xt to a viewable image and store it
             current_img = inverse_data_transform(xt).squeeze().cpu()
@@ -161,12 +163,12 @@ def unwrap_modelckpt(state_dict):
     from collections import OrderedDict
     new_state_dict = OrderedDict()
     for k, v in state_dict.items():
-        # name = k[7:] if k.startswith('module.') else k # remove 'module.'
-        name = k[6:] if k.startswith('model.') else k # remove 'model.' for pytorch lightning port
+        name = k[7:] if k.startswith('module.') else k # remove 'module.'
+        # name = k[6:] if k.startswith('model.') else k # remove 'model.' for pytorch lightning port
         new_state_dict[name] = v
     return new_state_dict
 
-def main(masked_img, masked_tensor, mask_tensor):
+def main(masked_img, masked_tensor, mask_tensor = None):
     # set random seed
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -219,18 +221,19 @@ def main(masked_img, masked_tensor, mask_tensor):
 
 if __name__ == '__main__':
     args, config = parse_args_and_config()
-    CKPT = 'ckpts/wd_ad600ALLc50s_2.ckpt'
+    CKPT = 'ckpts/WeatherDiff64.pth.tar'
     # setup device to run
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     print("Using device: {}".format(device))
     config.device = device
-    img_file = '../art_painting_data/test/masked/2a5a6ce95109caba13b6c840ed22638f.png'
-    mask_file = '../art_painting_data/test/mask/2a5a6ce95109caba13b6c840ed22638f.png'
+    img_file = '../raindrop_data/test_a/data/0_rain.png'
+    # mask_file = '../raindrop_data/test_a/mask/2a5a6ce95109caba13b6c840ed22638f.png'
     masked_img = Image.open(img_file).convert('RGB')
-    mask_img = Image.open(mask_file).convert('L')
+    # mask_img = Image.open(mask_file).convert('L')
     masked_tensor = to_tensor(masked_img)
-    mask_tensor = to_tensor(mask_img)
-    result = main(torch.cat([masked_tensor,mask_tensor], dim = 0), masked_tensor, mask_tensor)
+    # mask_tensor = to_tensor(mask_img)
+    # torch.cat([masked_tensor,mask_tensor], dim = 0), , mask_tensor
+    result = main(masked_tensor, masked_tensor)
     print(result.shape, result.min(), result.max())
     result = to_pil_image(result.squeeze().cpu())
     os.makedirs(f"outputs/{CKPT.split('/')[-1].split('.')[0]}", exist_ok = True)
