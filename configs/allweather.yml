@@ -6,6 +6,12 @@ data:
     data_dir: "/scratch/ozan/"
     conditional: True
 
+schedule_jump_params:
+  t_T: 250
+  n_sample: 1
+  jump_length: 10
+  jump_n_sample: 10
+
 model:
     in_channels: 3
     out_ch: 3
@@ -42,3 +48,4 @@ optim:
     lr: 0.00002
     amsgrad: False
     eps: 0.00000001
+    

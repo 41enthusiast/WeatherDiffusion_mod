@@ -1,0 +1,512 @@
+import torch as th
+import enum
+import numpy as np
+from collections import defaultdict
+from torchvision.transforms.functional import crop
+from tqdm import tqdm
+
+class GaussianDiffusionRepaintWD_modded:
+    def __init__(self,
+                 betas,
+                 corners,
+                 x_grid_mask,
+                 p_size,
+                 device
+                 ) -> None:
+        
+        self.device = device
+        self.betas = betas
+        self.corners = corners
+        self.x_grid_mask = x_grid_mask
+        self.p_size = p_size
+        assert len(betas.shape) == 1, "betas must be 1-D"
+        assert (betas > 0).all() and (betas <= 1).all()
+        self.num_timesteps = int(betas.shape[0])
+        # alphas = 1.0 - betas
+        # self.alphas_cumprod = np.cumprod(alphas, axis=0)
+        # self.alphas_cumprod_prev = np.append(1.0, self.alphas_cumprod[:-1])
+        # # self.alphas_cumprod_prev_prev = np.append(
+        # #     1.0, self.alphas_cumprod_prev[:-1])
+        # # self.alphas_cumprod_next = np.append(self.alphas_cumprod[1:], 0.0) # learned variance
+        # # assert self.alphas_cumprod_prev.shape == (self.num_timesteps,)
+
+        # self.sqrt_alphas_cumprod = np.sqrt(self.alphas_cumprod)
+        # self.sqrt_alphas_cumprod_prev = np.sqrt(self.alphas_cumprod_prev)
+        # # self.sqrt_one_minus_alphas_cumprod = np.sqrt(1.0 - self.alphas_cumprod)
+        # # self.log_one_minus_alphas_cumprod = np.log(1.0 - self.alphas_cumprod)
+
+        # #use these 2 terms to recover x0 from xt and eps
+        # self.sqrt_recip_alphas_cumprod = np.sqrt(1.0 / self.alphas_cumprod)#multiply with noisy image
+        # self.sqrt_recipm1_alphas_cumprod = np.sqrt(
+        #     1.0 / self.alphas_cumprod - 1)#multiply with gaussian noise
+        
+        # # self.posterior_variance = (
+        # #     betas * (1.0 - self.alphas_cumprod_prev) /
+        # #     (1.0 - self.alphas_cumprod)
+        # # )#use for repaint, not in ddim weather diffusion steps
+
+        # # self.posterior_log_variance_clipped = np.log(
+        # #     np.append(self.posterior_variance[1], self.posterior_variance[1:])
+        # # ) # for learning variance, not applicable for weather diffusion
+        # self.posterior_mean_coef1 = (
+        #     betas * np.sqrt(self.alphas_cumprod_prev) /
+        #     (1.0 - self.alphas_cumprod)
+        # )
+        # self.posterior_mean_coef2 = (
+        #     (1.0 - self.alphas_cumprod_prev)
+        #     * np.sqrt(alphas)
+        #     / (1.0 - self.alphas_cumprod)
+        # )
+
+    def undo(self, img_after_model, t):
+        return self._undo(img_after_model, t)
+
+    def _undo(self, img_out, t):
+        # beta = self._extract_into_tensor(self.betas, t, img_out.shape)
+        beta = self.betas.index_select(0, t.long()).view(-1, 1, 1, 1).to(img_out.dtype)
+
+        img_in_est = th.sqrt(1 - beta) * img_out + \
+            th.sqrt(beta) * th.randn_like(img_out)
+
+        return img_in_est
+    
+    def compute_alpha(self, t):
+        beta = th.cat([th.zeros(1).to(self.betas.device), self.betas], dim=0)
+        a = (1 - beta).cumprod(dim=0).index_select(0, t + 1).view(-1, 1, 1, 1)
+        return a
+
+    def p_sample(
+            self,
+            model,#unet noise estimator
+            x,#x_{t-1}, current noisy image
+            t,#startin at 0 for the first diffusion step
+            gt,
+            mask,
+            # clip_denoised=True,#whether to clip the predicted x_0 to [-1, 1]
+            # denoised_fn=None,
+            pred_xstart=None,
+        ):
+        """
+        Sample x_{t-1} from the model at the given timestep.
+        :param denoised_fn: if not None, a function which applies to the
+            x_start prediction before it is used to sample.
+        :param cond_fn: if not None, this is a gradient function that acts
+                        similarly to the model.
+        :return: a dict containing the following keys:
+                    - 'sample': a random sample from the model.
+                    - 'pred_xstart': a prediction of x_0.
+        """
+        # noise = th.randn_like(x)#gauss noise
+        # STITCHING STEP
+        if pred_xstart is not None:
+            # print("Stitching step")
+            gt_keep_mask = mask# later to uneti2i model where u get it
+            alpha_cumprod = self.alpha_cumprod
+
+            #weighting gt to same noise level as the noisy image
+            gt_weight = th.sqrt(alpha_cumprod)
+            gt_part = gt_weight * gt
+
+            noise_weight = th.sqrt((1 - alpha_cumprod))
+            noise_part = noise_weight * th.randn_like(x)
+
+            weighed_gt = gt_part + noise_part
+
+            #the actual stitching of noisy image and noised ground truth image
+            x = (
+                gt_keep_mask * (weighed_gt)
+                +
+                (1 - gt_keep_mask) * (x)
+            )
+
+        out = self.p_mean_variance(
+            model,
+            x,
+            t,
+            gt,
+            # clip_denoised=clip_denoised,
+            # denoised_fn=denoised_fn,
+        )
+
+        # nonzero_mask = (
+        #     (t != 0).float().view(-1, *([1] * (len(x.shape) - 1)))
+        # ) 
+
+        sample = out["mean"] #+ nonzero_mask * \
+            #th.exp(0.5 * out["log_variance"]) * noise
+
+        result = {"sample": sample,
+                    "pred_xstart": out["pred_xstart"], 'gt': gt}
+
+        return result
+
+    def get_wd_processed_output(self, model, x, t, gt):
+        manual_batching_size = 64
+        patch_pbar = tqdm(range(0, len(self.corners), manual_batching_size), 
+                        leave=False, 
+                        desc=f"Processing Patches (t={t.item()})")
+        et_output = th.zeros_like(x, device=x.device)#1x3xHxW
+        for p in patch_pbar:
+            current_batch_corners = self.corners[p:p+manual_batching_size]
+            
+            xt_patch = th.cat([crop(x, hi, wi, self.p_size, self.p_size) for (hi, wi) in current_batch_corners], dim=0)
+            x_cond_patch = th.cat([data_transform(crop(gt, hi, wi, self.p_size, self.p_size)) for (hi, wi) in current_batch_corners], dim=0).to(x.device)
+            
+            outputs = model(th.cat([x_cond_patch, 
+                                        xt_patch], dim=1), t)
+            for idx, (hi, wi) in enumerate(self.corners[p:p+manual_batching_size]):
+                et_output[0, :, hi:hi + self.p_size, wi:wi + self.p_size] += outputs[idx]  
+        et = th.div(et_output, self.x_grid_mask)
+        return et
+    
+    def p_mean_variance(
+            self,
+            model,
+            x, #[N x C x ...] tensor at time t.
+            t, #1D timesteps
+            gt,
+            # clip_denoised=True, #force denoised signal to be in [-1, 1]
+            # denoised_fn=None, 
+        ):
+            """
+            Apply the model to get p(x_{t-1} | x_t) (noise eta), as well as a prediction of
+            the initial x, x_0 (x_start).
+
+            :param denoised_fn: if not None, a function which applies to the
+                x_start prediction before it is used to sample. Applies before
+                clip_denoised.
+            :return: a dict with the following keys:
+                    - 'mean': the model mean output.
+                    - 'variance': the model variance output.
+                    - 'log_variance': the log of 'variance'.
+                    - 'pred_xstart': the prediction for x_0.
+            """
+            B, C = x.shape[:2]
+            assert t.shape == (B,), t.shape
+
+            print('Getting noise estimate for ', t.item(), 'th timestep')
+            model_output = self.get_wd_processed_output(model, x, t, gt)
+            
+            assert model_output.shape == (B, C, *x.shape[2:])
+            # LEARNED VARIANCE INTERPOLATION - higher qual, fewer steps
+            # model_output, model_var_values = th.split(model_output, C, dim=1)# splits channel into 2
+            # min_log = self._extract_into_tensor(
+            #     self.posterior_log_variance_clipped, t, x.shape
+            # )#posterior variance
+            # max_log = self._extract_into_tensor(np.log(self.betas), t, x.shape)#typically raw beta value for that step
+            # frac = (model_var_values + 1) / 2#-1 to 1 -> 0 to 1
+            # model_log_variance = frac * max_log + (1 - frac) * min_log # linear interpolation in log space
+            # model_variance = th.exp(model_log_variance)
+            # def process_xstart(x):
+            #     # if denoised_fn is not None:
+            #     #     x = denoised_fn(x)
+            #     # if clip_denoised:
+            #     #     return x.clamp(-1, 1)
+            #     return x
+            # pred_xstart = process_xstart(
+            #     self._predict_xstart_from_eps(x_t=x, t=t, eps=model_output)
+            # )
+            # model_mean, _, _ = self.q_posterior_mean_variance(
+            #     x_start=pred_xstart, x_t=x, t=t,
+            #     )
+
+            #x0_t
+            pred_xstart = (x - model_output * (1 - self.alpha_cumprod).sqrt()) / self.alpha_cumprod.sqrt()
+            # eta = 0.0
+            # c1 = eta * ((1 - self.alpha_cumprod / self.alpha_cumprod_prev) * (1 - self.alpha_cumprod_prev) / (1 - self.alpha_cumprod)).sqrt()
+            c2 = (1 - self.alpha_cumprod_prev) #- c1 ** 2
+            # print('Getting denoised sample')
+            model_mean =  self.alpha_cumprod_prev.sqrt() * pred_xstart + c2.sqrt() * model_output #+ c1*th.randn_like(x) 
+            
+            assert (
+                model_mean.shape == pred_xstart.shape == x.shape# == model_log_variance.shape
+            )
+
+            return {
+                "mean": model_mean,
+                # "variance": model_variance,
+                # "log_variance": model_log_variance,
+                "pred_xstart": pred_xstart,
+            }
+
+    # def _predict_xstart_from_eps(self,
+    #                             x_t, 
+    #                             t, 
+    #                             eps):
+    #         assert x_t.shape == eps.shape
+    #         return (
+    #             self._extract_into_tensor(
+    #                 self.sqrt_recip_alphas_cumprod, t, x_t.shape) * x_t
+    #             - self._extract_into_tensor(self.sqrt_recipm1_alphas_cumprod, t, x_t.shape) * eps
+    #         )
+
+
+    # def q_posterior_mean_variance(
+    #                             self,
+    #                             x_start, 
+    #                             x_t, 
+    #                             t):
+    #     """
+        
+
+    #     """
+    #     assert x_start.shape == x_t.shape
+    #     posterior_mean = (
+    #         self._extract_into_tensor(self.posterior_mean_coef1,
+    #                                 t, x_t.shape) * x_start
+    #         + self._extract_into_tensor(self.posterior_mean_coef2,
+    #                                 t, x_t.shape) * x_t
+    #     )
+    #     # posterior_variance = self._extract_into_tensor(
+    #     #     self.posterior_variance, t, x_t.shape)
+    #     # posterior_log_variance_clipped = self._extract_into_tensor(
+    #     #     self.posterior_log_variance_clipped, t, x_t.shape
+    #     # ) #for learning the variance
+    #     assert (
+    #         posterior_mean.shape[0]
+    #         # == posterior_variance.shape[0]
+    #         # == posterior_log_variance_clipped.shape[0]
+    #         == x_start.shape[0]
+    #     )
+    #     return posterior_mean#, posterior_variance, posterior_log_variance_clipped
+
+    # def _extract_into_tensor(self, arr, timesteps, broadcast_shape):
+    #     """
+    #     Takes the timewise indices from the input array and broadcasts it to the noisy image.
+
+    #     :param arr: the 1-D numpy array.
+    #     :param timesteps: a tensor of indices into the array to extract.
+    #     :param broadcast_shape: a larger shape of K dimensions with the batch
+    #                             dimension equal to the length of timesteps.
+    #     :return: a tensor of shape [batch_size, 1, ...] where the shape has K dims.
+    #     """
+    #     res = th.from_numpy(arr).to(device=timesteps.device)[timesteps].float()
+    #     while len(res.shape) < len(broadcast_shape):
+    #         res = res[..., None]
+    #     return res.expand(broadcast_shape)
+
+    def repaint_loop(
+            self,
+            model,#to get et after sampling all patches and averaging them over x_grid_mask
+            gt,#masked image, since clean image is not available
+            xt,
+            mask,#gt mask to recover image regions from
+            t_last,#seq, t, i
+            t_cur,#seq_next, t_next, j
+            jump_n_samples=5
+        ):
+            """
+            Generate samples from the model and yield intermediate samples from
+            each timestep of diffusion.
+
+            Arguments are the same as p_sample_loop().
+            Returns a generator over dicts, where each dict is the return value of
+            p_sample().
+            """
+
+            print("Repainting step, t_cur:", t_cur.item(), "t_last:", t_last.item())
+            self.gt_noises = None  # reset for next image. fixed noise consistency
+            # logging_timesteps = []
+
+            pred_xstart = None
+            image_after_step = xt #th.randn(*gt.shape, device=gt.device)
+            sample_idxs = defaultdict(lambda: 0)
+            self.alpha_cumprod = self.compute_alpha(t_last.long())#to predict clean image
+            self.alpha_cumprod_prev = self.compute_alpha(t_cur.long())#to determine how much clean signal to put back in, get the amount of noise to add in for the next step
+            for _ in range(jump_n_samples):
+                # if t_cur < t_last:  # reverse
+                #DENOISE step
+                # print('Denoising step')
+                # logging_timesteps.append(t_last.item())
+                with th.no_grad():
+                    out = self.p_sample(
+                        model,
+                        image_after_step,
+                        t_last,
+                        gt,
+                        mask,
+                        pred_xstart=pred_xstart
+                    )
+                    #cleaner version of image is stored here
+                    xt_next = out["sample"]
+                    pred_xstart = out["pred_xstart"]
+                    sample_idxs[t_cur] += 1
+                    
+                # else:
+                # JUMPBACK step- to harmonize the stitched image at the previous step
+                # print('Jumpback step')
+                # logging_timesteps.append(t_cur.item())
+                t_shift = abs(t_cur - t_last)
+                image_after_step = self.undo(
+                    xt_next,
+                    t=t_cur+t_shift)
+                pred_xstart = pred_xstart
+                
+            return xt_next
+
+def data_transform(X):#used at generalized_steps_overlapping
+    return 2 * X - 1.0
+
+# def p_sample_loop(
+    #         self,
+    #         model_output,#model module
+    #         shape,#(N, C, H, W)
+    #         # noise=None,#noise from encoder to sample
+    #         # clip_denoised=True,#whether to clip to [-1, 1]
+    #         # denoised_fn=None,
+    #         device=None,
+    #         progress=True,#whether to show a tqdm progress bar
+    #         return_all=False,
+    #         conf=None
+    #     ):
+    #     """
+    #     Generate samples from the model.
+    #     :param noise: if specified, the noise from the encoder to sample.
+    #                     Should be of the same shape as `shape`.
+    #     :param cond_fn: if not None, this is a gradient function that acts
+    #                     similarly to the model.
+    #     :return: a non-differentiable batch of samples.
+    #     """
+    #     final = None
+    #     for sample in self.p_sample_loop_progressive(
+    #         model_output,
+    #         shape,
+    #         # noise=noise,
+    #         # clip_denoised=clip_denoised,
+    #         # denoised_fn=denoised_fn,
+    #         device=device,
+    #         progress=progress,
+    #         conf=conf
+    #     ):
+    #         final = sample
+
+    #     # if return_all:
+    #     #     return final
+    #     # else:
+    #     return final["sample"]
+
+    # def p_sample_loop_progressive(
+    #     self,
+    #     model_output,
+    #     gt,
+    #     mask,
+    #     t_last,
+    #     t_cur,
+    #     # clip_denoised=True,
+    #     # denoised_fn=None,
+    #     noise=None,
+    #     device=None,
+    #     progress=False,
+    #     conf=None
+    # ):
+    #     """
+    #     Generate samples from the model and yield intermediate samples from
+    #     each timestep of diffusion.
+
+    #     Arguments are the same as p_sample_loop().
+    #     Returns a generator over dicts, where each dict is the return value of
+    #     p_sample().
+    #     """
+    #     shape = model_output.shape
+    #     if noise is not None:
+    #         image_after_step = noise
+    #     else:
+    #         image_after_step = th.randn(*shape, device=device)
+
+    #     self.gt_noises = None  # reset for next image
+
+    #     pred_xstart = None
+
+    #     idx_wall = -1
+    #     sample_idxs = defaultdict(lambda: 0)
+
+    #     times = get_schedule_jump(**conf.schedule_jump_params)
+
+    #     time_pairs = list(zip(times[:-1], times[1:]))
+    #     if progress:
+    #         from tqdm.auto import tqdm
+    #         time_pairs = tqdm(time_pairs)
+
+    #     for t_last, t_cur in time_pairs:
+    #         idx_wall += 1
+    #         t_last_t = th.tensor([t_last] * shape[0],  # pylint: disable=not-callable
+    #                                 device=device)
+
+    #         if t_cur < t_last:  # reverse
+    #             #DENOISE step
+    #             with th.no_grad():
+    #                 out = self.p_sample(
+    #                     model_output,
+    #                     image_after_step,
+    #                     # t_last_t,
+    #                     t_last,
+    #                     gt,
+    #                     mask,
+    #                     # clip_denoised=clip_denoised,
+    #                     # denoised_fn=denoised_fn,
+    #                     pred_xstart=pred_xstart
+    #                 )
+    #                 #cleaner version of image is stored here
+    #                 image_after_step = out["sample"]
+    #                 pred_xstart = out["pred_xstart"]
+
+    #                 sample_idxs[t_cur] += 1
+
+    #                 yield out
+    #         else:
+    #             # JUMPBACK step- to harmonize the stitched image at the previous step
+    #             t_shift = conf.get('inpa_inj_time_shift', 1)
+    #             image_after_step = self.undo(
+    #                 image_after_step,
+    #                 t=t_last_t+t_shift)
+    #             pred_xstart = out["pred_xstart"]
+
+# def _check_times(times, t_0, t_T):
+#     # Checks if timesteps are valid, i.e. in the correct range and in the correct order.
+    
+#     assert times[0] > times[1], (times[0], times[1])# Check end
+#     assert times[-1] == -1, times[-1]# Check beginning
+#     for t in times:# Value range
+#         assert t >= t_0, (t, t_0)
+#         assert t <= t_T, (t, t_T)
+
+# def get_schedule_jump(t_T, n_sample, jump_length, jump_n_sample,
+#                       start_resampling=100000000):
+
+#     jumps = {}
+#     for j in range(0, t_T - jump_length, jump_length):
+#         jumps[j] = jump_n_sample - 1
+
+#     t = t_T
+#     ts = []
+
+#     while t >= 1:
+#         t = t-1
+#         ts.append(t)
+
+#         if (
+#             t + 1 < t_T - 1 and
+#             t <= start_resampling
+#         ):
+#             for _ in range(n_sample - 1):
+#                 t = t + 1
+#                 ts.append(t)
+
+#                 if t >= 0:
+#                     t = t - 1
+#                     ts.append(t)
+
+#         if (
+#             jumps.get(t, 0) > 0 and #every 10 steps
+#             t <= start_resampling - jump_length
+#         ):
+#             jumps[t] = jumps[t] - 1
+#             for _ in range(jump_length):
+#                 t = t + 1
+#                 ts.append(t)
+
+#     ts.append(-1)
+
+#     _check_times(ts, -1, t_T)
+
+#     return ts

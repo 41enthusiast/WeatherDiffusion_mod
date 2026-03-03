@@ -243,6 +243,8 @@ print('Starting loading of model')
 start = time.time()
 checkpoint = torch.load(CKPT, map_location = device)
 model = DiffusionUNet(config).to(device)
+import torchsummary
+torchsummary.summary(model, [(1, 6, 64, 64), (64,)], device=device)
 model.eval()
 model_ckpt = unwrap_modelckpt(checkpoint['state_dict'])
 model.load_state_dict(model_ckpt, strict = False)
