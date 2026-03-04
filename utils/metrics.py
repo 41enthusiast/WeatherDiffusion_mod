@@ -104,22 +104,6 @@ def calculate_ssim(img1, img2, test_y_channel=False):
     return np.array(ssims).mean()
 
 
-def to_y_channel(img):
-    """Change to Y channel of YCbCr.
-
-    Args:
-        img (ndarray): Images with range [0, 255].
-
-    Returns:
-        (ndarray): Images with range [0, 255] (float type) without round.
-    """
-    img = img.astype(np.float32) / 255.
-    if img.ndim == 3 and img.shape[2] == 3:
-        img = bgr2ycbcr(img, y_only=True)
-        img = img[..., None]
-    return img * 255.
-
-
 def _convert_input_type_range(img):
     """Convert the type and range of the input image.
 
@@ -177,34 +161,14 @@ def _convert_output_type_range(img, dst_type):
     return img.astype(dst_type)
 
 
-def bgr2ycbcr(img, y_only=False):
-    """Convert a BGR image to YCbCr image.
 
-    The bgr version of rgb2ycbcr.
-    It implements the ITU-R BT.601 conversion for standard-definition
-    television. See more details in
-    https://en.wikipedia.org/wiki/YCbCr#ITU-R_BT.601_conversion.
-
-    It differs from a similar function in cv2.cvtColor: `BGR <-> YCrCb`.
-    In OpenCV, it implements a JPEG conversion. See more details in
-    https://en.wikipedia.org/wiki/YCbCr#JPEG_conversion.
-
-    Args:
-        img (ndarray): The input image. It accepts:
-            1. np.uint8 type with range [0, 255];
-            2. np.float32 type with range [0, 1].
-        y_only (bool): Whether to only return Y channel. Default: False.
-
-    Returns:
-        ndarray: The converted YCbCr image. The output image has the same type
-            and range as input image.
-    """
-    img_type = img.dtype
-    img = _convert_input_type_range(img)
-    if y_only:
-        out_img = np.dot(img, [24.966, 128.553, 65.481]) + 16.0
-    else:
-        out_img = np.matmul(
-            img, [[24.966, 112.0, -18.214], [128.553, -74.203, -93.786], [65.481, -37.797, 112.0]]) + [16, 128, 128]
-    out_img = _convert_output_type_range(out_img, img_type)
-    return out_img
+import cv2
+import torch
+if __name__ == '__main__':
+    img1 = cv2.imread('../../0_clean.png')
+    img2 = cv2.imread('../misc/0_clean_j5_s50.png')
+    psnr = calculate_psnr(img1, img2)
+    ssim = calculate_ssim(img1, img2)
+    print(f'PSNR: {psnr:.4f} dB')
+    print(f'SSIM: {ssim:.4f}')
+    print(f'L1 Loss: {torch.mean(torch.abs(torch.from_numpy(img1).float() - torch.from_numpy(img2).float())).item():.4f}')

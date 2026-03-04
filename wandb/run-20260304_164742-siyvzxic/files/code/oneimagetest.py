@@ -232,7 +232,7 @@ def main(masked_img, masked_tensor, mask_tensor = None):
         loop=0
     )
     print('Xs range', xs.min(), xs.max())
-    return gif_frames[-1]#inverse_data_transform(gif_frames[-1])
+    return inverse_data_transform(xs)
 
 def get_masked_image(img, mask):
     newW, newH = img.size
@@ -267,7 +267,7 @@ if __name__ == '__main__':
     mask_img = Image.open(mask_file).convert('L').resize((new_width, new_height), resample=Image.LANCZOS)
     masked_tensor = get_masked_image(gt_img, mask_img)
     
-    to_pil_image(masked_tensor.squeeze().cpu()).save(f"outputs/{CKPT.split('/')[-1].split('.')[0]}/{mask_file.split('/')[-1]}")
+    plt.imsave(f"outputs/{CKPT.split('/')[-1].split('.')[0]}/{mask_file.split('/')[-1]}", to_pil_image(masked_tensor.squeeze().cpu()))
     
     mask_tensor = to_tensor(mask_img)
     # torch.cat([masked_tensor,mask_tensor], dim = 0), , mask_tensor
@@ -275,4 +275,4 @@ if __name__ == '__main__':
     # print(result.shape, result.min(), result.max())
     result = to_pil_image(result.squeeze().cpu())
     os.makedirs(f"outputs/{CKPT.split('/')[-1].split('.')[0]}", exist_ok = True)
-    result.save(f"outputs/{CKPT.split('/')[-1].split('.')[0]}/{gt_file.split('/')[-1]}")
+    plt.imsave(f"outputs/{CKPT.split('/')[-1].split('.')[0]}/{gt_file.split('/')[-1]}", result)
