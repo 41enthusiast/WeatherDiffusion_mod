@@ -21,7 +21,7 @@ def load_image(file):
     return file.name
 
 def make_masked(img, mask):
-    return img * (1 - mask[:, :, None] / 255.0) + mask[:, :, None] / 255.0 * 255.0
+    return img * (1 - mask[:, :, None] / 255.0) + mask[:, :, None]
 
 
 def unwrap_modelckpt(state_dict):
@@ -225,7 +225,7 @@ def run_reverse_diffusion(masked_image, gt_img):
 CKPT = 'ckpts/WeatherDiff64.pth.tar'#'ckpts/wd_ad600ALLc50s_1.ckpt'
 SEED = 61
 R = 16
-SAMPLING_TIMESTEPS = 50#25
+SAMPLING_TIMESTEPS = 25
 start = time.time()
 with open(os.path.join("configs", "allweather.yml"), "r") as f:
     config = yaml.load(f, Loader = Loader)#not safe for arbitrary execution, but the loading time was painful
@@ -243,8 +243,6 @@ print('Starting loading of model')
 start = time.time()
 checkpoint = torch.load(CKPT, map_location = device)
 model = DiffusionUNet(config).to(device)
-import torchsummary
-torchsummary.summary(model, [(1, 6, 64, 64), (64,)], device=device)
 model.eval()
 model_ckpt = unwrap_modelckpt(checkpoint['state_dict'])
 model.load_state_dict(model_ckpt, strict = False)

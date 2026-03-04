@@ -1,0 +1,58 @@
+Alpha channel range 0.0 1.0
+ckpts/WeatherDiff64.pth.tar
+Initial random noise range -4.588535308837891 4.930560111999512
+Number of patches 1134
+Model Input torch.Size([1, 3, 480, 720]) tensor(-4.5885, device='cuda:0') tensor(4.9306, device='cuda:0')
+Masked tensor range and shape torch.Size([1, 3, 480, 720]) tensor(-0.9843, device='cuda:0') tensor(1., device='cuda:0')
+Denoising Steps:  76%|██████████████████████████████████████████████████████████████████████████████████████████████▏                             | 19/25 [10:46<03:24, 34.00s/it]
+Repainting step, t_cur: 920.0 t_last: 960.0
+Traceback (most recent call last):                                                                                                                                                
+Repainting step, t_cur: 880.0 t_last: 920.0
+Repainting step, t_cur: 840.0 t_last: 880.0
+Repainting step, t_cur: 800.0 t_last: 840.0
+Repainting step, t_cur: 760.0 t_last: 800.0
+Repainting step, t_cur: 720.0 t_last: 760.0
+Repainting step, t_cur: 680.0 t_last: 720.0
+Repainting step, t_cur: 640.0 t_last: 680.0
+Repainting step, t_cur: 600.0 t_last: 640.0
+Repainting step, t_cur: 560.0 t_last: 600.0
+Repainting step, t_cur: 520.0 t_last: 560.0
+Repainting step, t_cur: 480.0 t_last: 520.0
+Repainting step, t_cur: 440.0 t_last: 480.0
+Repainting step, t_cur: 400.0 t_last: 440.0
+Repainting step, t_cur: 360.0 t_last: 400.0
+Repainting step, t_cur: 320.0 t_last: 360.0
+Repainting step, t_cur: 280.0 t_last: 320.0
+Repainting step, t_cur: 240.0 t_last: 280.0
+Repainting step, t_cur: 200.0 t_last: 240.0
+Repainting step, t_cur: 160.0 t_last: 200.0
+  File "/mnt/c/Users/mridulav/Documents/code_repos/WeatherDiffusion_mod/oneimagetest.py", line 266, in <module>
+    result = main(masked_tensor, masked_tensor, mask_tensor)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/mridulav/Documents/code_repos/WeatherDiffusion_mod/oneimagetest.py", line 216, in main
+    xs, gif_frames = generalized_steps_overlapping(x_rand, masked_img, masked_tensor, mask_tensor, seq, model, betas, x_grid_mask, eta=0.,
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/mridulav/Documents/code_repos/WeatherDiffusion_mod/oneimagetest.py", line 142, in generalized_steps_overlapping
+    xt_next = recon_model.repaint_loop(model,
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/mridulav/Documents/code_repos/WeatherDiffusion_mod/repaint_implementation.py", line 230, in repaint_loop
+    })
+
+  File "/mnt/c/Users/mridulav/Documents/code_repos/WeatherDiffusion_mod/repaint_implementation.py", line 98, in p_sample
+  File "/mnt/c/Users/mridulav/Documents/code_repos/WeatherDiffusion_mod/repaint_implementation.py", line 156, in p_mean_variance
+    assert t.shape == (B,), t.shape
+                   ^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/mridulav/Documents/code_repos/WeatherDiffusion_mod/repaint_implementation.py", line 125, in get_wd_processed_output
+  File "/home/mridulav/miniconda3/envs/unet_tests/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mridulav/miniconda3/envs/unet_tests/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/mridulav/Documents/code_repos/WeatherDiffusion_mod/models/unet.py", line 306, in forward
+    temb = get_timestep_embedding(t, self.ch)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/mridulav/Documents/code_repos/WeatherDiffusion_mod/models/unet.py", line 23, in get_timestep_embedding
+    emb = emb.to(device=timesteps.device)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt

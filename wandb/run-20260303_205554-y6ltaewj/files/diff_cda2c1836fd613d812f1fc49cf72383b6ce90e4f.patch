@@ -1,0 +1,137 @@
+diff --git a/.gitignore b/.gitignore
+index e8951af..7a7efc3 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -5,4 +5,6 @@
+ *.xml
+ venv/
+ results/
+-ckpts/
+\ No newline at end of file
++ckpts/
++logs/
++outputs/
+\ No newline at end of file
+diff --git a/oneimagetest.py b/oneimagetest.py
+index 6c56e76..1cd7bda 100644
+--- a/oneimagetest.py
++++ b/oneimagetest.py
+@@ -238,6 +238,7 @@ def get_masked_image(img, mask):
+     return torch.tensor(img_rgb).permute(2,0,1)# / 255.0
+ 
+ if __name__ == '__main__':
++    import wandb
+     args, config = parse_args_and_config()
+     CKPT = 'ckpts/WeatherDiff64.pth.tar'
+     # setup device to run
+@@ -246,10 +247,12 @@ if __name__ == '__main__':
+     config.device = device
+     gt_file = '../raindrop_data/test_a/gt/0_clean.png'
+     mask_file = '../dtd/images/bubbly/bubbly_0138.jpg'
+-    masked_file = '../raindrop_data/test_a/data/0_rain.png'
++    # masked_file = '../raindrop_data/test_a/data/0_rain.png'
+     # mask_file = '../raindrop_data/test_a/mask/2a5a6ce95109caba13b6c840ed22638f.png'
+-    masked_img = Image.open(masked_file).convert('RGB')
+-    masked_tensor = to_tensor(masked_img)
++    # masked_img = Image.open(masked_file).convert('RGB')
++    # masked_tensor = to_tensor(masked_img)
++
++    wandb.init(project="wd_mod", name="repaint_1img_test")
+ 
+     gt_img = Image.open(gt_file).convert('RGB')
+     new_width, new_height = gt_img.size
+diff --git a/repaint_implementation.py b/repaint_implementation.py
+index f3981d0..a346252 100644
+--- a/repaint_implementation.py
++++ b/repaint_implementation.py
+@@ -4,7 +4,8 @@ import numpy as np
+ from collections import defaultdict
+ from torchvision.transforms.functional import crop
+ from tqdm import tqdm
+-from torchvision.transforms.functional import to_pil_image, to_tensor
++from torchvision.transforms.functional import to_pil_image
++import wandb
+ 
+ class GaussianDiffusionRepaintWD_modded:
+     def __init__(self,
+@@ -75,7 +76,17 @@ class GaussianDiffusionRepaintWD_modded:
+ 
+             weighed_gt = gt_part + noise_part
+ 
+-            print("Stitching Range of the model inputs", x.min().item(), x.max().item(), "and gt", gt.min().item(), gt.max().item(), "and weighed_gt", weighed_gt.min().item(), weighed_gt.max().item())
++            wandb.log({
++                "timestep": t.item(),
++                "range/gt_min": gt.min().item(),
++                "range/gt_max": gt.max().item(),
++                "range/gt_mean": gt.mean().item(),
++                "range/gt_std": gt.std().item(),
++                "range/weighed_gt_min": weighed_gt.min().item(),
++                "range/weighed_gt_max": weighed_gt.max().item(),
++                "range/weighed_gt_mean": weighed_gt.mean().item(),
++                "range/weighed_gt_std": weighed_gt.std().item(),
++            })
+             #the actual stitching of noisy image and noised ground truth image
+             x = (
+                 gt_keep_mask * (weighed_gt)
+@@ -142,13 +153,25 @@ class GaussianDiffusionRepaintWD_modded:
+             B, C = x.shape[:2]
+             assert t.shape == (B,), t.shape
+ 
+-            # print('Getting noise estimate for ', t.item(), 'th timestep')
+             model_output = self.get_wd_processed_output(model, x, t, gt)
+-            
++            wandb.log({
++                "timestep": t.item(),
++                "range/model_output_min": model_output.min().item(),
++                "range/model_output_max": model_output.max().item(),
++                "range/model_output_mean": model_output.mean().item(),
++                "range/model_output_std": model_output.std().item(),
++            })
+             assert model_output.shape == (B, C, *x.shape[2:])
+ 
+             #x0_t
+             pred_xstart = (x - model_output * (1 - self.alpha_cumprod).sqrt()) / self.alpha_cumprod.sqrt()
++            wandb.log({
++                "timestep": t.item(),
++                "range/pred_xstart_min": pred_xstart.min().item(),
++                "range/pred_xstart_max": pred_xstart.max().item(),
++                "range/pred_xstart_mean": pred_xstart.mean().item(),
++                "range/pred_xstart_std": pred_xstart.std().item(),
++            })
+             # eta = 0.0
+             # c1 = eta * ((1 - self.alpha_cumprod / self.alpha_cumprod_prev) * (1 - self.alpha_cumprod_prev) / (1 - self.alpha_cumprod)).sqrt()
+             c2 = (1 - self.alpha_cumprod_prev) #- c1 ** 2
+@@ -196,8 +219,13 @@ class GaussianDiffusionRepaintWD_modded:
+                 # if t_cur < t_last:  # reverse
+                 #DENOISE step
+                 # print('Denoising step')
+-                # logging_timesteps.append(t_last.item())
+-                # print("xt range", image_after_step.min().item(), image_after_step.max().item())
++                wandb.log({
++                    "timestep": t_last.item(),
++                    "range/xt_min": image_after_step.min().item(),
++                    "range/xt_max": image_after_step.max().item(),
++                    "range/xt_mean": image_after_step.mean().item(),
++                    "range/xt_std": image_after_step.std().item(),
++                })
+                 with th.no_grad():
+                     out = self.p_sample(
+                         model,
+@@ -220,7 +248,13 @@ class GaussianDiffusionRepaintWD_modded:
+                 image_after_step = self.undo(
+                     xt_next,
+                     t=t_cur+t_shift)
+-                pred_xstart = pred_xstart
++                wandb.log({
++                    "timestep": t_cur.item(),
++                    "range/xt_jumpback_min": image_after_step.min().item(),
++                    "range/xt_jumpback_max": image_after_step.max().item(),
++                    "range/xt_jumpback_mean": image_after_step.mean().item(),
++                    "range/xt_jumpback_std": image_after_step.std().item(),
++                })
+                 
+             return xt_next
+ 
+diff --git a/reverse_diffusion.gif b/reverse_diffusion.gif
+index 2798486..1104e99 100644
+Binary files a/reverse_diffusion.gif and b/reverse_diffusion.gif differ

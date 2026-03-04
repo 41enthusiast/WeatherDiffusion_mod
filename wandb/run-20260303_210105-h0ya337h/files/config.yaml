@@ -1,0 +1,62 @@
+_wandb:
+    value:
+        cli_version: 0.23.1
+        code_path: code/oneimagetest.py
+        e:
+            qazlmsv50p83ccaalco8zkf766pcjvwu:
+                args:
+                    - --config
+                    - allweather.yml
+                    - --grid_r
+                    - "32"
+                codePath: oneimagetest.py
+                codePathLocal: oneimagetest.py
+                cpu_count: 6
+                cpu_count_logical: 12
+                cudaVersion: "13.1"
+                disk:
+                    /:
+                        total: "1081101176832"
+                        used: "61417451520"
+                email: txlx81@durham.ac.uk
+                executable: /home/mridulav/miniconda3/envs/unet_tests/bin/python
+                git:
+                    commit: cda2c1836fd613d812f1fc49cf72383b6ce90e4f
+                    remote: https://github.com/41enthusiast/WeatherDiffusion_mod.git
+                gpu: NVIDIA GeForce GTX 1650 Ti
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Turing
+                      memoryTotal: "4294967296"
+                      name: NVIDIA GeForce GTX 1650 Ti
+                      uuid: GPU-7a5c7974-97f9-5d6f-c234-9c49d9e11ed7
+                host: DESKTOP-5M05SI6
+                memory:
+                    total: "8255655936"
+                os: Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39
+                program: /mnt/c/Users/mridulav/Documents/code_repos/WeatherDiffusion_mod/oneimagetest.py
+                python: CPython 3.11.14
+                root: /mnt/c/Users/mridulav/Documents/code_repos/WeatherDiffusion_mod
+                startedAt: "2026-03-04T02:01:05.622009Z"
+                writerId: qazlmsv50p83ccaalco8zkf766pcjvwu
+        m: []
+        python_version: 3.11.14
+        t:
+            "1":
+                - 1
+                - 9
+                - 41
+                - 103
+                - 105
+            "2":
+                - 1
+                - 9
+                - 41
+                - 103
+                - 105
+            "3":
+                - 13
+            "4": 3.11.14
+            "5": 0.23.1
+            "12": 0.23.1
+            "13": linux-x86_64

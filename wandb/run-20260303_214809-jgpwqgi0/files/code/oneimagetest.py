@@ -218,9 +218,9 @@ def main(masked_img, masked_tensor, mask_tensor = None):
     betas = np.linspace(0.0001, 0.02, 1000, dtype=np.float64)
     betas = torch.from_numpy(betas).float().to(device)
     x_grid_mask = torch.zeros_like(x_rand, device=device)
-    # window = get_2d_window(p_size, device)
+    window = get_2d_window(p_size, device)
     for (hi, wi) in corners:
-        x_grid_mask[:, :, hi:hi + p_size, wi:wi + p_size] += 1
+        x_grid_mask[:, :, hi:hi + p_size, wi:wi + p_size] += window 
     xs, gif_frames = generalized_steps_overlapping(x_rand, masked_img, masked_tensor, mask_tensor, seq, model, betas, x_grid_mask, eta=0.,
                                                             corners=corners, p_size=p_size)
     xs = xs[-1]
@@ -253,8 +253,8 @@ if __name__ == '__main__':
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     print("Using device: {}".format(device))
     config.device = device
-    gt_file = '../0_clean.png'
-    mask_file = '../bubbly_0138.jpg'
+    gt_file = '../raindrop_data/test_a/gt/0_clean.png'
+    mask_file = '../dtd/images/bubbly/bubbly_0138.jpg'
     # masked_file = '../raindrop_data/test_a/data/0_rain.png'
     # mask_file = '../raindrop_data/test_a/mask/2a5a6ce95109caba13b6c840ed22638f.png'
     # masked_img = Image.open(masked_file).convert('RGB')

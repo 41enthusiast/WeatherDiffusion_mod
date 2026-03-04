@@ -4,7 +4,8 @@ import numpy as np
 from collections import defaultdict
 from torchvision.transforms.functional import crop
 from tqdm import tqdm
-from torchvision.transforms.functional import to_pil_image, to_tensor
+from torchvision.transforms.functional import to_pil_image
+import wandb
 
 class GaussianDiffusionRepaintWD_modded:
     def __init__(self,
@@ -19,6 +20,7 @@ class GaussianDiffusionRepaintWD_modded:
         self.betas = betas
         self.corners = corners
         self.x_grid_mask = x_grid_mask
+        self.x_grid_mask[x_grid_mask==0] = 1.0   # to avoid division by zero when averaging overlapping patches
         self.p_size = p_size
         assert len(betas.shape) == 1, "betas must be 1-D"
         assert (betas > 0).all() and (betas <= 1).all()
@@ -29,6 +31,11 @@ class GaussianDiffusionRepaintWD_modded:
 
     def _undo(self, img_out, t):
         beta = self.betas.index_select(0, t.long()).view(-1, 1, 1, 1).to(img_out.dtype)
+        wandb.log({
+            "timestep": t.item(),
+            "range/sqrt_beta_mean":  th.sqrt(beta).mean().item(),
+            "range/sqrt_alpha_mean": th.sqrt(1 - beta).mean().item(),
+        })
 
         img_in_est = th.sqrt(1 - beta) * img_out + \
             th.sqrt(beta) * th.randn_like(img_out)
@@ -75,7 +82,17 @@ class GaussianDiffusionRepaintWD_modded:
 
             weighed_gt = gt_part + noise_part
 
-            print("Stitching Range of the model inputs", x.min().item(), x.max().item(), "and gt", gt.min().item(), gt.max().item(), "and weighed_gt", weighed_gt.min().item(), weighed_gt.max().item())
+            wandb.log({
+                "timestep": t.item(),
+                "range/gt_min": gt.min().item(),
+                "range/gt_max": gt.max().item(),
+                "range/gt_mean": gt.mean().item(),
+                "range/gt_std": gt.std().item(),
+                "range/weighed_gt_min": weighed_gt.min().item(),
+                "range/weighed_gt_max": weighed_gt.max().item(),
+                "range/weighed_gt_mean": weighed_gt.mean().item(),
+                "range/weighed_gt_std": weighed_gt.std().item(),
+            })
             #the actual stitching of noisy image and noised ground truth image
             x = (
                 gt_keep_mask * (weighed_gt)
@@ -104,7 +121,6 @@ class GaussianDiffusionRepaintWD_modded:
                         leave=False, 
                         desc=f"Processing Patches (t={t.item()})")
         et_output = th.zeros_like(x, device=x.device)#1x3xHxW
-        # print("Range of the model inputs", x.min().item(), x.max().item(), "and gt", gt.min().item(), gt.max().item())
         for p in patch_pbar:
             current_batch_corners = self.corners[p:p+manual_batching_size]
             
@@ -115,8 +131,8 @@ class GaussianDiffusionRepaintWD_modded:
                                         xt_patch], dim=1), t)
             for idx, (hi, wi) in enumerate(self.corners[p:p+manual_batching_size]):
                 et_output[0, :, hi:hi + self.p_size, wi:wi + self.p_size] += outputs[idx]  
+        
         et = th.div(et_output, self.x_grid_mask)
-        # print("Range of the model output before stitching", et.min().item(), et.max().item())
         return et
     
     def p_mean_variance(
@@ -142,13 +158,25 @@ class GaussianDiffusionRepaintWD_modded:
             B, C = x.shape[:2]
             assert t.shape == (B,), t.shape
 
-            # print('Getting noise estimate for ', t.item(), 'th timestep')
             model_output = self.get_wd_processed_output(model, x, t, gt)
-            
+            wandb.log({
+                "timestep": t.item(),
+                "range/model_output_min": model_output.min().item(),
+                "range/model_output_max": model_output.max().item(),
+                "range/model_output_mean": model_output.mean().item(),
+                "range/model_output_std": model_output.std().item(),
+            })
             assert model_output.shape == (B, C, *x.shape[2:])
 
             #x0_t
             pred_xstart = (x - model_output * (1 - self.alpha_cumprod).sqrt()) / self.alpha_cumprod.sqrt()
+            wandb.log({
+                "timestep": t.item(),
+                "range/pred_xstart_min": pred_xstart.min().item(),
+                "range/pred_xstart_max": pred_xstart.max().item(),
+                "range/pred_xstart_mean": pred_xstart.mean().item(),
+                "range/pred_xstart_std": pred_xstart.std().item(),
+            })
             # eta = 0.0
             # c1 = eta * ((1 - self.alpha_cumprod / self.alpha_cumprod_prev) * (1 - self.alpha_cumprod_prev) / (1 - self.alpha_cumprod)).sqrt()
             c2 = (1 - self.alpha_cumprod_prev) #- c1 ** 2
@@ -196,8 +224,13 @@ class GaussianDiffusionRepaintWD_modded:
                 # if t_cur < t_last:  # reverse
                 #DENOISE step
                 # print('Denoising step')
-                # logging_timesteps.append(t_last.item())
-                # print("xt range", image_after_step.min().item(), image_after_step.max().item())
+                wandb.log({
+                    "timestep": t_last.item(),
+                    "range/xt_min": image_after_step.min().item(),
+                    "range/xt_max": image_after_step.max().item(),
+                    "range/xt_mean": image_after_step.mean().item(),
+                    "range/xt_std": image_after_step.std().item(),
+                })
                 with th.no_grad():
                     out = self.p_sample(
                         model,
@@ -220,7 +253,13 @@ class GaussianDiffusionRepaintWD_modded:
                 image_after_step = self.undo(
                     xt_next,
                     t=t_cur+t_shift)
-                pred_xstart = pred_xstart
+                wandb.log({
+                    "timestep": t_cur.item(),
+                    "range/xt_jumpback_min": image_after_step.min().item(),
+                    "range/xt_jumpback_max": image_after_step.max().item(),
+                    "range/xt_jumpback_mean": image_after_step.mean().item(),
+                    "range/xt_jumpback_std": image_after_step.std().item(),
+                })
                 
             return xt_next
 

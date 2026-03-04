@@ -1,0 +1,188 @@
+diff --git a/.gitignore b/.gitignore
+index e8951af..7a7efc3 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -5,4 +5,6 @@
+ *.xml
+ venv/
+ results/
+-ckpts/
+\ No newline at end of file
++ckpts/
++logs/
++outputs/
+\ No newline at end of file
+diff --git a/oneimagetest.py b/oneimagetest.py
+index 6c56e76..9231fc1 100644
+--- a/oneimagetest.py
++++ b/oneimagetest.py
+@@ -172,6 +172,13 @@ def unwrap_modelckpt(state_dict):
+         new_state_dict[name] = v
+     return new_state_dict
+ 
++def get_2d_window(size, device):
++    # Create a 1D window and expand to 2D
++    # Using a periodic cosine (Hanning-like) window
++    w1d = torch.hann_window(size, periodic=False, device=device)
++    w2d = w1d.view(-1, 1) * w1d.view(1, -1)
++    return w2d # Shape: [64, 64]
++
+ def main(masked_img, masked_tensor, mask_tensor = None):
+     # set random seed
+     torch.manual_seed(args.seed)
+@@ -211,8 +218,9 @@ def main(masked_img, masked_tensor, mask_tensor = None):
+     betas = np.linspace(0.0001, 0.02, 1000, dtype=np.float64)
+     betas = torch.from_numpy(betas).float().to(device)
+     x_grid_mask = torch.zeros_like(x_rand, device=device)
++    window = get_2d_window(p_size, device)
+     for (hi, wi) in corners:
+-        x_grid_mask[:, :, hi:hi + p_size, wi:wi + p_size] += 1 
++        x_grid_mask[:, :, hi:hi + p_size, wi:wi + p_size] += window 
+     xs, gif_frames = generalized_steps_overlapping(x_rand, masked_img, masked_tensor, mask_tensor, seq, model, betas, x_grid_mask, eta=0.,
+                                                             corners=corners, p_size=p_size)
+     xs = xs[-1]
+@@ -238,6 +246,7 @@ def get_masked_image(img, mask):
+     return torch.tensor(img_rgb).permute(2,0,1)# / 255.0
+ 
+ if __name__ == '__main__':
++    import wandb
+     args, config = parse_args_and_config()
+     CKPT = 'ckpts/WeatherDiff64.pth.tar'
+     # setup device to run
+@@ -246,10 +255,12 @@ if __name__ == '__main__':
+     config.device = device
+     gt_file = '../raindrop_data/test_a/gt/0_clean.png'
+     mask_file = '../dtd/images/bubbly/bubbly_0138.jpg'
+-    masked_file = '../raindrop_data/test_a/data/0_rain.png'
++    # masked_file = '../raindrop_data/test_a/data/0_rain.png'
+     # mask_file = '../raindrop_data/test_a/mask/2a5a6ce95109caba13b6c840ed22638f.png'
+-    masked_img = Image.open(masked_file).convert('RGB')
+-    masked_tensor = to_tensor(masked_img)
++    # masked_img = Image.open(masked_file).convert('RGB')
++    # masked_tensor = to_tensor(masked_img)
++
++    wandb.init(project="wd_mod", name="repaint_1img_test")
+ 
+     gt_img = Image.open(gt_file).convert('RGB')
+     new_width, new_height = gt_img.size
+diff --git a/repaint_implementation.py b/repaint_implementation.py
+index f3981d0..0bf6330 100644
+--- a/repaint_implementation.py
++++ b/repaint_implementation.py
+@@ -4,7 +4,8 @@ import numpy as np
+ from collections import defaultdict
+ from torchvision.transforms.functional import crop
+ from tqdm import tqdm
+-from torchvision.transforms.functional import to_pil_image, to_tensor
++from torchvision.transforms.functional import to_pil_image
++import wandb
+ 
+ class GaussianDiffusionRepaintWD_modded:
+     def __init__(self,
+@@ -19,6 +20,7 @@ class GaussianDiffusionRepaintWD_modded:
+         self.betas = betas
+         self.corners = corners
+         self.x_grid_mask = x_grid_mask
++        self.x_grid_mask[x_grid_mask==0] = 1.0   # to avoid division by zero when averaging overlapping patches
+         self.p_size = p_size
+         assert len(betas.shape) == 1, "betas must be 1-D"
+         assert (betas > 0).all() and (betas <= 1).all()
+@@ -75,7 +77,17 @@ class GaussianDiffusionRepaintWD_modded:
+ 
+             weighed_gt = gt_part + noise_part
+ 
+-            print("Stitching Range of the model inputs", x.min().item(), x.max().item(), "and gt", gt.min().item(), gt.max().item(), "and weighed_gt", weighed_gt.min().item(), weighed_gt.max().item())
++            wandb.log({
++                "timestep": t.item(),
++                "range/gt_min": gt.min().item(),
++                "range/gt_max": gt.max().item(),
++                "range/gt_mean": gt.mean().item(),
++                "range/gt_std": gt.std().item(),
++                "range/weighed_gt_min": weighed_gt.min().item(),
++                "range/weighed_gt_max": weighed_gt.max().item(),
++                "range/weighed_gt_mean": weighed_gt.mean().item(),
++                "range/weighed_gt_std": weighed_gt.std().item(),
++            })
+             #the actual stitching of noisy image and noised ground truth image
+             x = (
+                 gt_keep_mask * (weighed_gt)
+@@ -104,7 +116,6 @@ class GaussianDiffusionRepaintWD_modded:
+                         leave=False, 
+                         desc=f"Processing Patches (t={t.item()})")
+         et_output = th.zeros_like(x, device=x.device)#1x3xHxW
+-        # print("Range of the model inputs", x.min().item(), x.max().item(), "and gt", gt.min().item(), gt.max().item())
+         for p in patch_pbar:
+             current_batch_corners = self.corners[p:p+manual_batching_size]
+             
+@@ -115,8 +126,8 @@ class GaussianDiffusionRepaintWD_modded:
+                                         xt_patch], dim=1), t)
+             for idx, (hi, wi) in enumerate(self.corners[p:p+manual_batching_size]):
+                 et_output[0, :, hi:hi + self.p_size, wi:wi + self.p_size] += outputs[idx]  
++        
+         et = th.div(et_output, self.x_grid_mask)
+-        # print("Range of the model output before stitching", et.min().item(), et.max().item())
+         return et
+     
+     def p_mean_variance(
+@@ -142,13 +153,25 @@ class GaussianDiffusionRepaintWD_modded:
+             B, C = x.shape[:2]
+             assert t.shape == (B,), t.shape
+ 
+-            # print('Getting noise estimate for ', t.item(), 'th timestep')
+             model_output = self.get_wd_processed_output(model, x, t, gt)
+-            
++            wandb.log({
++                "timestep": t.item(),
++                "range/model_output_min": model_output.min().item(),
++                "range/model_output_max": model_output.max().item(),
++                "range/model_output_mean": model_output.mean().item(),
++                "range/model_output_std": model_output.std().item(),
++            })
+             assert model_output.shape == (B, C, *x.shape[2:])
+ 
+             #x0_t
+             pred_xstart = (x - model_output * (1 - self.alpha_cumprod).sqrt()) / self.alpha_cumprod.sqrt()
++            wandb.log({
++                "timestep": t.item(),
++                "range/pred_xstart_min": pred_xstart.min().item(),
++                "range/pred_xstart_max": pred_xstart.max().item(),
++                "range/pred_xstart_mean": pred_xstart.mean().item(),
++                "range/pred_xstart_std": pred_xstart.std().item(),
++            })
+             # eta = 0.0
+             # c1 = eta * ((1 - self.alpha_cumprod / self.alpha_cumprod_prev) * (1 - self.alpha_cumprod_prev) / (1 - self.alpha_cumprod)).sqrt()
+             c2 = (1 - self.alpha_cumprod_prev) #- c1 ** 2
+@@ -196,8 +219,13 @@ class GaussianDiffusionRepaintWD_modded:
+                 # if t_cur < t_last:  # reverse
+                 #DENOISE step
+                 # print('Denoising step')
+-                # logging_timesteps.append(t_last.item())
+-                # print("xt range", image_after_step.min().item(), image_after_step.max().item())
++                wandb.log({
++                    "timestep": t_last.item(),
++                    "range/xt_min": image_after_step.min().item(),
++                    "range/xt_max": image_after_step.max().item(),
++                    "range/xt_mean": image_after_step.mean().item(),
++                    "range/xt_std": image_after_step.std().item(),
++                })
+                 with th.no_grad():
+                     out = self.p_sample(
+                         model,
+@@ -220,7 +248,13 @@ class GaussianDiffusionRepaintWD_modded:
+                 image_after_step = self.undo(
+                     xt_next,
+                     t=t_cur+t_shift)
+-                pred_xstart = pred_xstart
++                wandb.log({
++                    "timestep": t_cur.item(),
++                    "range/xt_jumpback_min": image_after_step.min().item(),
++                    "range/xt_jumpback_max": image_after_step.max().item(),
++                    "range/xt_jumpback_mean": image_after_step.mean().item(),
++                    "range/xt_jumpback_std": image_after_step.std().item(),
++                })
+                 
+             return xt_next
+ 
+diff --git a/reverse_diffusion.gif b/reverse_diffusion.gif
+index 2798486..1104e99 100644
+Binary files a/reverse_diffusion.gif and b/reverse_diffusion.gif differ
