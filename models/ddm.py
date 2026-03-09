@@ -78,10 +78,11 @@ def get_beta_schedule(*, beta_start, beta_end, num_diffusion_timesteps):
 
 def noise_estimation_loss(model, x0, t, e, b):
     a = (1-b).cumprod(dim=0).index_select(0, t).view(-1, 1, 1, 1).to(x0.dtype)
+    CH_SPLIT = 3
     #modded, considering mask explicitly inside the model only rn
-    x = x0[:, 4:, :, :] * a.sqrt() + e * (1.0 - a).sqrt()
+    x = x0[:, CH_SPLIT:, :, :] * a.sqrt() + e * (1.0 - a).sqrt()
     # print(x0.dtype, x.dtype, t.dtype)
-    output = model(torch.cat([x0[:, :4, :, :], x], dim=1), t)
+    output = model(torch.cat([x0[:, :CH_SPLIT, :, :], x], dim=1), t)
     return (e - output).square().sum(dim=(1, 2, 3)).mean(dim=0)
 
 
@@ -139,93 +140,3 @@ class DenoisingDiffusion(pl.LightningModule):
     def on_train_batch_end(self, outputs, batch, batch_idx):
         print('Updating ema')
         self.ema_helper.update(self.model)
-    
-    # def load_ddm_ckpt(self, load_path, ema=False):
-    #     checkpoint = utils.logging.load_checkpoint(load_path, None)
-    #     self.start_epoch = checkpoint['epoch']
-    #     self.step = checkpoint['step']
-    #     self.model.load_state_dict(checkpoint['state_dict'], strict=True)
-    #     self.optimizer.load_state_dict(checkpoint['optimizer'])
-    #     self.ema_helper.load_state_dict(checkpoint['ema_helper'])
-    #     if ema:
-    #         self.ema_helper.ema(self.model)
-    #     print("=> loaded checkpoint '{}' (epoch {}, step {})".format(load_path, checkpoint['epoch'], self.step))
-
-    # def train(self, DATASET):
-    #     cudnn.benchmark = True
-    #     train_loader = DATASET.get_loaders()
-
-    #     if os.path.isfile(self.args.resume):
-    #         self.load_ddm_ckpt(self.args.resume)
-
-    #     for epoch in range(self.start_epoch, self.config.training.n_epochs):
-    #         print('epoch: ', epoch)
-    #         data_start = time.time()
-    #         data_time = 0
-    #         for i, (x, y) in enumerate(train_loader):
-                
-    #             n = x.size(0)
-    #             data_time += time.time() - data_start
-    #             self.model.train()
-    #             self.step += 1
-
-    #             x = x.to(self.device)
-    #             x = data_transform(x)
-    #             e = torch.randn_like(x[:, 3:, :, :])
-    #             b = self.betas
-
-    #             # antithetic sampling
-    #             t = torch.randint(low=0, high=self.num_timesteps, size=(n // 2 + 1,)).to(self.device)
-    #             t = torch.cat([t, self.num_timesteps - t - 1], dim=0)[:n]
-    #             loss = noise_estimation_loss(self.model, x, t, e, b)
-
-    #             if self.step % 10 == 0:
-    #                 print(f"step: {self.step}, loss: {loss.item()}, data time: {data_time / (i+1)}")
-
-    #             self.optimizer.zero_grad()
-    #             loss.backward()
-    #             self.optimizer.step()
-    #             self.ema_helper.update(self.model)
-    #             data_start = time.time()
-
-    #             # if self.step % self.config.training.validation_freq == 0:
-    #             #     self.model.eval()
-    #             #     self.sample_validation_patches(val_loader, self.step)
-
-    #             if self.step % self.config.training.snapshot_freq == 0 or self.step == 1:
-    #                 utils.logging.save_checkpoint({
-    #                     'epoch': epoch + 1,
-    #                     'step': self.step,
-    #                     'state_dict': self.model.state_dict(),
-    #                     'optimizer': self.optimizer.state_dict(),
-    #                     'ema_helper': self.ema_helper.state_dict(),
-    #                     'params': self.args,
-    #                     'config': self.config
-    #                 }, filename=os.path.join(self.config.data.data_dir, 'ckpts', self.config.data.dataset + '_ddpm'))
-
-    # def sample_image(self, x_cond, x, last=True, patch_locs=None, patch_size=None):
-    #     skip = self.config.diffusion.num_diffusion_timesteps // self.args.sampling_timesteps
-    #     seq = range(0, self.config.diffusion.num_diffusion_timesteps, skip)
-    #     xs = utils.sampling.generalized_steps(x, x_cond, seq, self.model, self.betas, eta=0.)
-    #     if last:
-    #         xs = xs[0][-1]
-    #     return xs
-    
-    # def sample_validation_patches(self, val_loader, step):
-    #     image_folder = os.path.join(self.args.image_folder, self.config.data.dataset + str(self.config.data.image_size))
-    #     with torch.no_grad():
-    #         print(f"Processing a single batch of validation images at step: {step}")
-    #         for i, (x, y) in enumerate(val_loader):
-    #             x = x.flatten(start_dim=0, end_dim=1) if x.ndim == 5 else x
-    #             break
-    #         n = x.size(0)
-    #         x_cond = x[:, :3, :, :].to(self.device)
-    #         x_cond = data_transform(x_cond)
-    #         x = torch.randn(n, 3, self.config.data.image_size, self.config.data.image_size, device=self.device)
-    #         x = self.sample_image(x_cond, x)
-    #         x = inverse_data_transform(x)
-    #         x_cond = inverse_data_transform(x_cond)
-
-    #         for i in range(n):
-    #             utils.logging.save_image(x_cond[i], os.path.join(image_folder, str(step), f"{i}_cond.png"))
-    #             utils.logging.save_image(x[i], os.path.join(image_folder, str(step), f"{i}.png"))

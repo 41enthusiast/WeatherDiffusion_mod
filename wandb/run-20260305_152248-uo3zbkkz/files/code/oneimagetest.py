@@ -172,6 +172,13 @@ def unwrap_modelckpt(state_dict):
         new_state_dict[name] = v
     return new_state_dict
 
+def get_2d_window(size, device):
+    # Create a 1D window and expand to 2D
+    # Using a periodic cosine (Hanning-like) window
+    w1d = torch.hann_window(size, periodic=False, device=device)
+    w2d = w1d.view(-1, 1) * w1d.view(1, -1)
+    return w2d # Shape: [64, 64]
+
 def main(masked_img, masked_tensor, mask_tensor = None):
     # set random seed
     torch.manual_seed(args.seed)
@@ -199,7 +206,7 @@ def main(masked_img, masked_tensor, mask_tensor = None):
     #     ema_helper.ema(model) # This copies the smooth weights into your model
 
     r = args.grid_r
-    p_size = config.data.image_size
+    p_size = config.data.patch_size
     x_rand = torch.randn([1,3,]+list(masked_img.shape[2:]), device = config.device)
     print("Initial random noise range", x_rand.min().item(), x_rand.max().item())
     # print(x_rand.shape, masked_img.shape)
@@ -211,6 +218,7 @@ def main(masked_img, masked_tensor, mask_tensor = None):
     betas = np.linspace(0.0001, 0.02, 1000, dtype=np.float64)
     betas = torch.from_numpy(betas).float().to(device)
     x_grid_mask = torch.zeros_like(x_rand, device=device)
+    # window = get_2d_window(p_size, device)
     for (hi, wi) in corners:
         x_grid_mask[:, :, hi:hi + p_size, wi:wi + p_size] += 1
     xs, gif_frames = generalized_steps_overlapping(x_rand, masked_img, masked_tensor, mask_tensor, seq, model, betas, x_grid_mask, eta=0.,
@@ -239,34 +247,32 @@ def get_masked_image(img, mask):
 
 if __name__ == '__main__':
     import wandb
-    log_test = False
     args, config = parse_args_and_config()
     CKPT = 'ckpts/WeatherDiff64.pth.tar'
     # setup device to run
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     print("Using device: {}".format(device))
     config.device = device
-    gt_file = '../data/qual_tests/4_clean.png'
-    mask_file = '../data/dtd/images/grooved/grooved_0061.jpg'
-    
-    os.makedirs(f"outputs/{CKPT.split('/')[-1].split('.')[0]}", exist_ok = True)
+    gt_file = '../0_clean.png'
+    mask_file = '../bubbly_0138.jpg'
     # masked_file = '../raindrop_data/test_a/data/0_rain.png'
     # mask_file = '../raindrop_data/test_a/mask/2a5a6ce95109caba13b6c840ed22638f.png'
     # masked_img = Image.open(masked_file).convert('RGB')
     # masked_tensor = to_tensor(masked_img)
-    if log_test:
-        wandb.init(project="wd_mod", name="repaint_1img_test_ncc")
+
+    wandb.init(project="wd_mod", name="repaint_1img_test")
 
     gt_img = Image.open(gt_file).convert('RGB')
     new_width, new_height = gt_img.size
     mask_img = Image.open(mask_file).convert('L').resize((new_width, new_height), resample=Image.LANCZOS)
     masked_tensor = get_masked_image(gt_img, mask_img)
     
-    to_pil_image(masked_tensor.squeeze().cpu()).save(f"outputs/{CKPT.split('/')[-1].split('.')[0]}_v3/{mask_file.split('/')[-1]}")
+    to_pil_image(masked_tensor.squeeze().cpu()).save(f"outputs/{CKPT.split('/')[-1].split('.')[0]}/{mask_file.split('/')[-1]}")
     
     mask_tensor = to_tensor(mask_img)
     # torch.cat([masked_tensor,mask_tensor], dim = 0), , mask_tensor
     result = main(masked_tensor.clone(), masked_tensor.clone(), mask_tensor.clone())
     # print(result.shape, result.min(), result.max())
-    # result = to_pil_image(result.squeeze().cpu())
-    result.save(f"outputs/{CKPT.split('/')[-1].split('.')[0]}_v3/r32_{gt_file.split('/')[-1]}")
+    result = to_pil_image(result.squeeze().cpu())
+    os.makedirs(f"outputs/{CKPT.split('/')[-1].split('.')[0]}", exist_ok = True)
+    result.save(f"outputs/{CKPT.split('/')[-1].split('.')[0]}/{gt_file.split('/')[-1]}")

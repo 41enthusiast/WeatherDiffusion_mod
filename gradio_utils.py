@@ -224,7 +224,7 @@ def run_reverse_diffusion(masked_image, gt_img):
     
 CKPT = 'ckpts/WeatherDiff64.pth.tar'#'ckpts/wd_ad600ALLc50s_1.ckpt'
 SEED = 61
-R = 16
+R = 64
 SAMPLING_TIMESTEPS = 50
 start = time.time()
 with open(os.path.join("configs", "allweather.yml"), "r") as f:

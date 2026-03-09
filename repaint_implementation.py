@@ -6,7 +6,7 @@ from torchvision.transforms.functional import crop
 from tqdm import tqdm
 from torchvision.transforms.functional import to_pil_image
 import wandb
-
+simple_test = True
 class GaussianDiffusionRepaintWD_modded:
     def __init__(self,
                  betas,
@@ -31,11 +31,12 @@ class GaussianDiffusionRepaintWD_modded:
 
     def _undo(self, img_out, t):
         beta = self.betas.index_select(0, t.long()).view(-1, 1, 1, 1).to(img_out.dtype)
-        wandb.log({
-            "timestep": t.item(),
-            "range/sqrt_beta_mean":  th.sqrt(beta).mean().item(),
-            "range/sqrt_alpha_mean": th.sqrt(1 - beta).mean().item(),
-        })
+        if not simple_test:
+            wandb.log({
+                "timestep": t.item(),
+                "range/sqrt_beta_mean":  th.sqrt(beta).mean().item(),
+                "range/sqrt_alpha_mean": th.sqrt(1 - beta).mean().item(),
+            })
 
         img_in_est = th.sqrt(1 - beta) * img_out + \
             th.sqrt(beta) * th.randn_like(img_out)
@@ -82,24 +83,25 @@ class GaussianDiffusionRepaintWD_modded:
 
             weighed_gt = gt_part + noise_part
 
-            wandb.log({
-                "timestep": t.item(),
-                "range/gt_min": gt.min().item(),
-                "range/gt_max": gt.max().item(),
-                "range/gt_mean": gt.mean().item(),
-                "range/gt_std": gt.std().item(),
-                "range/weighed_gt_min": weighed_gt.min().item(),
-                "range/weighed_gt_max": weighed_gt.max().item(),
-                "range/weighed_gt_mean": weighed_gt.mean().item(),
-                "range/weighed_gt_std": weighed_gt.std().item(),
-            })
+            if not simple_test:
+                wandb.log({
+                    "timestep": t.item(),
+                    "range/gt_min": gt.min().item(),
+                    "range/gt_max": gt.max().item(),
+                    "range/gt_mean": gt.mean().item(),
+                    "range/gt_std": gt.std().item(),
+                    "range/weighed_gt_min": weighed_gt.min().item(),
+                    "range/weighed_gt_max": weighed_gt.max().item(),
+                    "range/weighed_gt_mean": weighed_gt.mean().item(),
+                    "range/weighed_gt_std": weighed_gt.std().item(),
+                })
             #the actual stitching of noisy image and noised ground truth image
             x = (
                 gt_keep_mask * (weighed_gt)
                 +
                 (1 - gt_keep_mask) * (x)
             )
-            to_pil_image(x.squeeze().cpu()).save("outputs/WeatherDiff64/stitched_image_t"+str(t.item())+".png")
+            # to_pil_image(x.squeeze().cpu()).save("outputs/WeatherDiff64/stitched_image_t"+str(t.item())+".png")
 
         out = self.p_mean_variance(
             model,
@@ -116,7 +118,7 @@ class GaussianDiffusionRepaintWD_modded:
         return result
 
     def get_wd_processed_output(self, model, x, t, gt):
-        manual_batching_size = 64
+        manual_batching_size = 128#1024#len(self.corners)
         patch_pbar = tqdm(range(0, len(self.corners), manual_batching_size), 
                         leave=False, 
                         desc=f"Processing Patches (t={t.item()})")
@@ -135,6 +137,18 @@ class GaussianDiffusionRepaintWD_modded:
         et = th.div(et_output, self.x_grid_mask)
         return et
     
+    def dynamic_thresholding(self,pred_xstart, p=0.995, s=1.0):
+        """
+        Clamps the signal but scales it back if values exceed 's'.
+        """
+        # Calculate the 'p'-th percentile absolute value
+        s_thresh = th.quantile(th.abs(pred_xstart), p)
+        s_thresh = th.maximum(s_thresh, th.tensor(s).to(s_thresh.device))
+        
+        # Clamp to [-s_thresh, s_thresh] and then normalize back to [-s, s]
+        pred_xstart = th.clamp(pred_xstart, -s_thresh, s_thresh) / (s_thresh / s)
+        return pred_xstart
+
     def p_mean_variance(
             self,
             model,
@@ -159,24 +173,27 @@ class GaussianDiffusionRepaintWD_modded:
             assert t.shape == (B,), t.shape
 
             model_output = self.get_wd_processed_output(model, x, t, gt)
-            wandb.log({
-                "timestep": t.item(),
-                "range/model_output_min": model_output.min().item(),
-                "range/model_output_max": model_output.max().item(),
-                "range/model_output_mean": model_output.mean().item(),
-                "range/model_output_std": model_output.std().item(),
-            })
+            if not simple_test:
+                wandb.log({
+                    "timestep": t.item(),
+                    "range/model_output_min": model_output.min().item(),
+                    "range/model_output_max": model_output.max().item(),
+                    "range/model_output_mean": model_output.mean().item(),
+                    "range/model_output_std": model_output.std().item(),
+                })
             assert model_output.shape == (B, C, *x.shape[2:])
 
             #x0_t
             pred_xstart = (x - model_output * (1 - self.alpha_cumprod).sqrt()) / self.alpha_cumprod.sqrt()
-            wandb.log({
-                "timestep": t.item(),
-                "range/pred_xstart_min": pred_xstart.min().item(),
-                "range/pred_xstart_max": pred_xstart.max().item(),
-                "range/pred_xstart_mean": pred_xstart.mean().item(),
-                "range/pred_xstart_std": pred_xstart.std().item(),
-            })
+            pred_xstart = self.dynamic_thresholding(pred_xstart)#.clamp(-1, 1)#explodes for jumpbacks>=5
+            if not simple_test:
+                wandb.log({
+                    "timestep": t.item(),
+                    "range/pred_xstart_min": pred_xstart.min().item(),
+                    "range/pred_xstart_max": pred_xstart.max().item(),
+                    "range/pred_xstart_mean": pred_xstart.mean().item(),
+                    "range/pred_xstart_std": pred_xstart.std().item(),
+                })
             # eta = 0.0
             # c1 = eta * ((1 - self.alpha_cumprod / self.alpha_cumprod_prev) * (1 - self.alpha_cumprod_prev) / (1 - self.alpha_cumprod)).sqrt()
             c2 = (1 - self.alpha_cumprod_prev) #- c1 ** 2
@@ -211,7 +228,7 @@ class GaussianDiffusionRepaintWD_modded:
             p_sample().
             """
 
-            print("Repainting step, t_cur:", t_cur.item(), "t_last:", t_last.item())
+            # print("Repainting step, t_cur:", t_cur.item(), "t_last:", t_last.item())
             self.gt_noises = None  # reset for next image. fixed noise consistency
             # logging_timesteps = []
 
@@ -220,17 +237,18 @@ class GaussianDiffusionRepaintWD_modded:
             sample_idxs = defaultdict(lambda: 0)
             self.alpha_cumprod = self.compute_alpha(t_last.long())#to predict clean image
             self.alpha_cumprod_prev = self.compute_alpha(t_cur.long())#to determine how much clean signal to put back in, get the amount of noise to add in for the next step
-            for _ in range(jump_n_samples):
+            for jumps in range(jump_n_samples):
                 # if t_cur < t_last:  # reverse
                 #DENOISE step
                 # print('Denoising step')
-                wandb.log({
-                    "timestep": t_last.item(),
-                    "range/xt_min": image_after_step.min().item(),
-                    "range/xt_max": image_after_step.max().item(),
-                    "range/xt_mean": image_after_step.mean().item(),
-                    "range/xt_std": image_after_step.std().item(),
-                })
+                if not simple_test:
+                    wandb.log({
+                        "timestep": t_last.item(),
+                        "range/xt_min": image_after_step.min().item(),
+                        "range/xt_max": image_after_step.max().item(),
+                        "range/xt_mean": image_after_step.mean().item(),
+                        "range/xt_std": image_after_step.std().item(),
+                    })
                 with th.no_grad():
                     out = self.p_sample(
                         model,
@@ -253,14 +271,15 @@ class GaussianDiffusionRepaintWD_modded:
                 image_after_step = self.undo(
                     xt_next,
                     t=t_cur+t_shift)
-                wandb.log({
-                    "timestep": t_cur.item(),
-                    "range/xt_jumpback_min": image_after_step.min().item(),
-                    "range/xt_jumpback_max": image_after_step.max().item(),
-                    "range/xt_jumpback_mean": image_after_step.mean().item(),
-                    "range/xt_jumpback_std": image_after_step.std().item(),
-                })
-                
+                if not simple_test:
+                    wandb.log({
+                        "timestep": t_cur.item(),
+                        "range/xt_jumpback_min": image_after_step.min().item(),
+                        "range/xt_jumpback_max": image_after_step.max().item(),
+                        "range/xt_jumpback_mean": image_after_step.mean().item(),
+                        "range/xt_jumpback_std": image_after_step.std().item(),
+                    })
+            # print("Repainting jumps done", jumps)  
             return xt_next
 
 

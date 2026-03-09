@@ -165,8 +165,8 @@ def _convert_output_type_range(img, dst_type):
 import cv2
 import torch
 if __name__ == '__main__':
-    img1 = cv2.imread('../../0_clean.png')
-    img2 = cv2.imread('../misc/0_clean_j5_s50.png')
+    img1 = cv2.imread('../qual_tests/0_clean.png')
+    img2 = cv2.imread('../outputs/WeatherDiff64/WeatherDiff64/1jr8_0_clean.png')
     psnr = calculate_psnr(img1, img2)
     ssim = calculate_ssim(img1, img2)
     print(f'PSNR: {psnr:.4f} dB')

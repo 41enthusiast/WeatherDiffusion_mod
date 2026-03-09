@@ -1,59 +1,113 @@
 Alpha channel range 0.0 1.0
 ckpts/WeatherDiff64.pth.tar
 Initial random noise range -4.588535308837891 4.930560111999512
-Number of patches 1134
+Number of patches 77
 Model Input torch.Size([1, 3, 480, 720]) tensor(-4.5885, device='cuda:0') tensor(4.9306, device='cuda:0')
 Masked tensor range and shape torch.Size([1, 3, 480, 720]) tensor(-0.9843, device='cuda:0') tensor(1., device='cuda:0')
-Denoising Steps:  60%|███████████████████████████████████████████████████████████████▌                                          | 30/50 [49:19<53:50, 161.53s/it]
+Denoising Steps:  30%|████████████████████████████████                                                                           | 15/50 [03:51<05:50, 10.03s/it]
 Repainting step, t_cur: 960.0 t_last: 980.0
                                                                                                                                                                  
+Repainting jumps done 0
 Repainting step, t_cur: 940.0 t_last: 960.0
+Repainting jumps done 0
 Repainting step, t_cur: 920.0 t_last: 940.0
+Repainting jumps done 0
 Repainting step, t_cur: 900.0 t_last: 920.0
+Repainting jumps done 0
 Repainting step, t_cur: 880.0 t_last: 900.0
+Repainting jumps done 0
 Repainting step, t_cur: 860.0 t_last: 880.0
+Repainting jumps done 0
 Repainting step, t_cur: 840.0 t_last: 860.0
+Repainting jumps done 0
 Repainting step, t_cur: 820.0 t_last: 840.0
+Repainting jumps done 0
 Repainting step, t_cur: 800.0 t_last: 820.0
+Repainting jumps done 0
 Repainting step, t_cur: 780.0 t_last: 800.0
+Repainting jumps done 0
 Repainting step, t_cur: 760.0 t_last: 780.0
+Repainting jumps done 0
 Repainting step, t_cur: 740.0 t_last: 760.0
+Repainting jumps done 0
 Repainting step, t_cur: 720.0 t_last: 740.0
+Repainting jumps done 0
 Repainting step, t_cur: 700.0 t_last: 720.0
+Repainting jumps done 0
 Repainting step, t_cur: 680.0 t_last: 700.0
+Repainting jumps done 0
 Repainting step, t_cur: 660.0 t_last: 680.0
+Repainting jumps done 0
 Repainting step, t_cur: 640.0 t_last: 660.0
+Repainting jumps done 0
 Repainting step, t_cur: 620.0 t_last: 640.0
+Repainting jumps done 0
 Repainting step, t_cur: 600.0 t_last: 620.0
+Repainting jumps done 0
 Repainting step, t_cur: 580.0 t_last: 600.0
+Repainting jumps done 0
 Repainting step, t_cur: 560.0 t_last: 580.0
+Repainting jumps done 0
 Repainting step, t_cur: 540.0 t_last: 560.0
+Repainting jumps done 0
 Repainting step, t_cur: 520.0 t_last: 540.0
+Repainting jumps done 0
 Repainting step, t_cur: 500.0 t_last: 520.0
+Repainting jumps done 0
 Repainting step, t_cur: 480.0 t_last: 500.0
+Repainting jumps done 0
 Repainting step, t_cur: 460.0 t_last: 480.0
+Repainting jumps done 0
 Repainting step, t_cur: 440.0 t_last: 460.0
+Repainting jumps done 0
 Repainting step, t_cur: 420.0 t_last: 440.0
+Repainting jumps done 0
 Repainting step, t_cur: 400.0 t_last: 420.0
+Repainting jumps done 0
 Repainting step, t_cur: 380.0 t_last: 400.0
+Repainting jumps done 0
 Repainting step, t_cur: 360.0 t_last: 380.0
+Repainting jumps done 0
 Repainting step, t_cur: 340.0 t_last: 360.0
+Repainting jumps done 0
 Repainting step, t_cur: 320.0 t_last: 340.0
+Repainting jumps done 0
 Repainting step, t_cur: 300.0 t_last: 320.0
+Repainting jumps done 0
 Repainting step, t_cur: 280.0 t_last: 300.0
+Repainting jumps done 0
 Repainting step, t_cur: 260.0 t_last: 280.0
+Repainting jumps done 0
 Repainting step, t_cur: 240.0 t_last: 260.0
+Repainting jumps done 0
 Repainting step, t_cur: 220.0 t_last: 240.0
+Repainting jumps done 0
 Repainting step, t_cur: 200.0 t_last: 220.0
+Repainting jumps done 0
 Repainting step, t_cur: 180.0 t_last: 200.0
+Repainting jumps done 0
 Repainting step, t_cur: 160.0 t_last: 180.0
+Repainting jumps done 0
 Repainting step, t_cur: 140.0 t_last: 160.0
+Repainting jumps done 0
 Repainting step, t_cur: 120.0 t_last: 140.0
+Repainting jumps done 0
 Repainting step, t_cur: 100.0 t_last: 120.0
+Repainting jumps done 0
 Repainting step, t_cur: 80.0 t_last: 100.0
+Repainting jumps done 0
 Repainting step, t_cur: 60.0 t_last: 80.0
+Repainting jumps done 0
 Repainting step, t_cur: 40.0 t_last: 60.0
+Repainting jumps done 0
 Repainting step, t_cur: 20.0 t_last: 40.0
+Repainting jumps done 0
 Repainting step, t_cur: 0.0 t_last: 20.0
+Repainting jumps done 0
 Repainting step, t_cur: -1.0 t_last: 0.0
-Xs range tensor(-1.0530, device='cuda:0') tensor(1.0819, device='cuda:0')
+Repainting jumps done 0
+Xs range tensor(-1., device='cuda:0') tensor(1., device='cuda:0')
+  File "/mnt/c/Users/mridulav/Documents/code_repos/WeatherDiffusion_mod/oneimagetest.py", line 268, in <module>
+    result = to_pil_image(result.squeeze().cpu())
+                          ^^^^^^^^^^^^^^
+AttributeError: 'Image' object has no attribute 'squeeze'
