@@ -6,7 +6,9 @@ from torchvision.transforms.functional import crop
 from tqdm import tqdm
 from torchvision.transforms.functional import to_pil_image
 import wandb
-simple_test = True
+
+log_test = False
+DN_BATCH =196
 class GaussianDiffusionRepaintWD_modded:
     def __init__(self,
                  betas,
@@ -31,7 +33,7 @@ class GaussianDiffusionRepaintWD_modded:
 
     def _undo(self, img_out, t):
         beta = self.betas.index_select(0, t.long()).view(-1, 1, 1, 1).to(img_out.dtype)
-        if not simple_test:
+        if log_test:
             wandb.log({
                 "timestep": t.item(),
                 "range/sqrt_beta_mean":  th.sqrt(beta).mean().item(),
@@ -52,7 +54,7 @@ class GaussianDiffusionRepaintWD_modded:
             self,
             model,#unet noise estimator
             x,#x_{t-1}, current noisy image
-            t,#startin at 0 for the first diffusion step
+            t,
             gt,
             mask,
             pred_xstart=None,
@@ -69,21 +71,21 @@ class GaussianDiffusionRepaintWD_modded:
         """
         # noise = th.randn_like(x)#gauss noise
         # STITCHING STEP
+        
+        #weighting gt to same noise level as the noisy image
+        gt_part = th.sqrt(self.alpha_cumprod) * gt#*2 -1.0)
+        noise_part = th.sqrt((1 - self.alpha_cumprod)) * th.randn_like(x)
+        weighed_gt = gt_part + noise_part
+
+        gt_keep_mask = mask# later to uneti2i model where u get it
+        # gt_keep_mask[gt_keep_mask>0.3] = 1
+        # gt_keep_mask[gt_keep_mask<=0.3] = 0
+        # gt_keep_mask[100:,100:] = 1
+        to_pil_image(gt_keep_mask.squeeze()).save('outputs/WeatherDiff64_v4/binary_mask.jpg')
         if pred_xstart is not None:
             # print("Stitching step")
-            gt_keep_mask = mask# later to uneti2i model where u get it
-            alpha_cumprod = self.alpha_cumprod
-
-            #weighting gt to same noise level as the noisy image
-            gt_weight = th.sqrt(alpha_cumprod)
-            gt_part = gt_weight * gt#*2 -1.0)
-
-            noise_weight = th.sqrt((1 - alpha_cumprod))
-            noise_part = noise_weight * th.randn_like(x)
-
-            weighed_gt = gt_part + noise_part
-
-            if not simple_test:
+            
+            if log_test:
                 wandb.log({
                     "timestep": t.item(),
                     "range/gt_min": gt.min().item(),
@@ -97,9 +99,9 @@ class GaussianDiffusionRepaintWD_modded:
                 })
             #the actual stitching of noisy image and noised ground truth image
             x = (
-                gt_keep_mask * (weighed_gt)
+                (1-gt_keep_mask) * (weighed_gt)
                 +
-                (1 - gt_keep_mask) * (x)
+                (gt_keep_mask) * (x)
             )
             # to_pil_image(x.squeeze().cpu()).save("outputs/WeatherDiff64/stitched_image_t"+str(t.item())+".png")
 
@@ -107,7 +109,7 @@ class GaussianDiffusionRepaintWD_modded:
             model,
             x,
             t,
-            gt,
+            gt*(1-gt_keep_mask)+(gt_keep_mask)*noise_part,
         )
 
         sample = out["mean"] 
@@ -118,7 +120,7 @@ class GaussianDiffusionRepaintWD_modded:
         return result
 
     def get_wd_processed_output(self, model, x, t, gt):
-        manual_batching_size = 128#1024#len(self.corners)
+        manual_batching_size = DN_BATCH#len(self.corners)
         patch_pbar = tqdm(range(0, len(self.corners), manual_batching_size), 
                         leave=False, 
                         desc=f"Processing Patches (t={t.item()})")
@@ -173,7 +175,7 @@ class GaussianDiffusionRepaintWD_modded:
             assert t.shape == (B,), t.shape
 
             model_output = self.get_wd_processed_output(model, x, t, gt)
-            if not simple_test:
+            if log_test:
                 wandb.log({
                     "timestep": t.item(),
                     "range/model_output_min": model_output.min().item(),
@@ -186,7 +188,7 @@ class GaussianDiffusionRepaintWD_modded:
             #x0_t
             pred_xstart = (x - model_output * (1 - self.alpha_cumprod).sqrt()) / self.alpha_cumprod.sqrt()
             pred_xstart = self.dynamic_thresholding(pred_xstart)#.clamp(-1, 1)#explodes for jumpbacks>=5
-            if not simple_test:
+            if log_test:
                 wandb.log({
                     "timestep": t.item(),
                     "range/pred_xstart_min": pred_xstart.min().item(),
@@ -228,7 +230,7 @@ class GaussianDiffusionRepaintWD_modded:
             p_sample().
             """
 
-            # print("Repainting step, t_cur:", t_cur.item(), "t_last:", t_last.item())
+            print("Repainting step, t_cur:", t_cur.item(), "t_last:", t_last.item())
             self.gt_noises = None  # reset for next image. fixed noise consistency
             # logging_timesteps = []
 
@@ -241,7 +243,7 @@ class GaussianDiffusionRepaintWD_modded:
                 # if t_cur < t_last:  # reverse
                 #DENOISE step
                 # print('Denoising step')
-                if not simple_test:
+                if log_test:
                     wandb.log({
                         "timestep": t_last.item(),
                         "range/xt_min": image_after_step.min().item(),
@@ -271,7 +273,7 @@ class GaussianDiffusionRepaintWD_modded:
                 image_after_step = self.undo(
                     xt_next,
                     t=t_cur+t_shift)
-                if not simple_test:
+                if log_test:
                     wandb.log({
                         "timestep": t_cur.item(),
                         "range/xt_jumpback_min": image_after_step.min().item(),
@@ -279,7 +281,7 @@ class GaussianDiffusionRepaintWD_modded:
                         "range/xt_jumpback_mean": image_after_step.mean().item(),
                         "range/xt_jumpback_std": image_after_step.std().item(),
                     })
-            # print("Repainting jumps done", jumps)  
+            print("Repainting jumps done", jumps)  
             return xt_next
 
 

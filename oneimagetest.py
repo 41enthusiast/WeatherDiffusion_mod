@@ -62,6 +62,10 @@ def parse_args_and_config():
                         help="Path to the config file")
     parser.add_argument('--resume', default='ckpts/WeatherDiff64.pth.tar', type=str,
                         help='Path for the diffusion model checkpoint to load for evaluation')
+    parser.add_argument('--image', default='../data/qual_tests/4_clean.png', type=str,
+                        help='Image path')
+    parser.add_argument('--mask', default='../data/dtd/images/grooved/grooved_0061.jpg', type=str,
+                        help='Mask path')
     parser.add_argument("--grid_r", type=int, default=16,
                         help="Grid cell width r that defines the overlap between patches")
     parser.add_argument("--sampling_timesteps", type=int, default=25,
@@ -111,56 +115,56 @@ def compute_alpha(beta, t):
     return a
 
 def generalized_steps_overlapping(x, x_cond, masked_tensor, mask_tensor, seq, model, b, x_grid_mask, eta=0., corners=None, p_size=None):
-    with torch.no_grad():
-        n = x.size(0)
-        seq_next = [-1] + list(seq[:-1])
-        # x0_preds = []
-        xs = [x]
-        gif_frames = []
-        if mask_tensor is not None:
-            mask_tensor = mask_tensor.to(x.device)#1x1xHxW
+    # with torch.no_grad():
+    n = x.size(0)
+    seq_next = [-1] + list(seq[:-1])
+    # x0_preds = []
+    xs = [x]
+    gif_frames = []
+    if mask_tensor is not None:
+        mask_tensor = mask_tensor.to(x.device)#1x1xHxW
 
-        masked_tensor = data_transform(masked_tensor.to(x.device))#1x3xHxW
+    masked_tensor = data_transform(masked_tensor.to(x.device))#1x3xHxW
 
-        print("Model Input", xs[-1].shape, xs[-1].min(), xs[-1].max())
-        print("Masked tensor range and shape",masked_tensor.shape, masked_tensor.min(), masked_tensor.max())
+    print("Model Input", xs[-1].shape, xs[-1].min(), xs[-1].max())
+    print("Masked tensor range and shape",masked_tensor.shape, masked_tensor.min(), masked_tensor.max())
 
-        recon_model = GaussianDiffusionRepaintWD_modded(b, 
-                                                        corners, 
-                                                        x_grid_mask,
-                                                        p_size, 
-                                                        x.device)
-        #seq is t_cur, seq_next is t_last
-        for i, j in tqdm(zip(reversed(seq), reversed(seq_next)), total=len(seq), desc="Denoising Steps"):
-            #denoising steps here
-            t = (torch.ones(n) * i).to(x.device)#1,
-            next_t = (torch.ones(n) * j).to(x.device)#1,
-            # at = compute_alpha(b, t.long())#1x1x1x1
-            # at_next = compute_alpha(b, next_t.long())#1x1x1x1
-            xt = xs[-1].to('cuda')#1x3xHxW
-            
-            xt_next = recon_model.repaint_loop(model,
-                                          masked_tensor,
-                                          xt,
-                                          mask_tensor,
-                                          t, next_t,
-                                          1
-                                          )
+    recon_model = GaussianDiffusionRepaintWD_modded(b, 
+                                                    corners, 
+                                                    x_grid_mask,
+                                                    p_size, 
+                                                    x.device)
+    #seq is t_cur, seq_next is t_last
+    for i, j in tqdm(zip(reversed(seq), reversed(seq_next)), total=len(seq), desc="Denoising Steps"):
+        #denoising steps here
+        t = (torch.ones(n) * i).to(x.device)#1,
+        next_t = (torch.ones(n) * j).to(x.device)#1,
+        # at = compute_alpha(b, t.long())#1x1x1x1
+        # at_next = compute_alpha(b, next_t.long())#1x1x1x1
+        xt = xs[-1].to('cuda')#1x3xHxW
+        
+        xt_next = recon_model.repaint_loop(model,
+                                        masked_tensor,
+                                        xt,
+                                        mask_tensor,
+                                        t, next_t,
+                                        10
+                                        )
 
-            # x0_t = (xt - et * (1 - at).sqrt()) / at.sqrt()
-            # x0_preds.append(x0_t.to('cpu'))
-            
-            # c2 = ((1 - at_next) - c1 ** 2).sqrt()
-            # xt_next = at_next.sqrt() * x0_t + c1 * torch.randn_like(x) + c2 * et
-            # # xs.append(xt_next.to('cpu'))
-            # # xs = [xt_next*(1-mask_tensor) + (mask_tensor)*masked_tensor]#to reuse good parts of the image
-            xs = [xt_next]#original no reuse
-            assert xt_next.max() <=20, "Exploding values, something is wrong at"+str(i)+"th step with max value "+str(xt_next.max())
-            # --- GIF LOGIC ---
-            # Convert the current xt to a viewable image and store it
-            current_img = inverse_data_transform(xt).squeeze().cpu()
-            # Convert to PIL Image: (C, H, W) -> (H, W, C)
-            gif_frames.append(to_pil_image(current_img))
+        # x0_t = (xt - et * (1 - at).sqrt()) / at.sqrt()
+        # x0_preds.append(x0_t.to('cpu'))
+        
+        # c2 = ((1 - at_next) - c1 ** 2).sqrt()
+        # xt_next = at_next.sqrt() * x0_t + c1 * torch.randn_like(x) + c2 * et
+        # # xs.append(xt_next.to('cpu'))
+        # # xs = [xt_next*(1-mask_tensor) + (mask_tensor)*masked_tensor]#to reuse good parts of the image
+        xs = [xt_next]#original no reuse
+        assert xt_next.max() <=20, "Exploding values, something is wrong at"+str(i)+"th step with max value "+str(xt_next.max())
+        # --- GIF LOGIC ---
+        # Convert the current xt to a viewable image and store it
+        current_img = inverse_data_transform(xt).squeeze().cpu()
+        # Convert to PIL Image: (C, H, W) -> (H, W, C)
+        gif_frames.append(to_pil_image(current_img))
     return xs, gif_frames#, x0_preds
 
 def unwrap_modelckpt(state_dict):
@@ -237,6 +241,54 @@ def get_masked_image(img, mask):
     
     return torch.tensor(img_rgb).permute(2,0,1)# / 255.0
 
+import cv2
+import numpy as np
+
+def color_region_match(src_img, mask, target_img):
+    # 1. Convert both to LAB color space
+    src_lab = cv2.cvtColor(src_img, cv2.COLOR_RGB2LAB)
+    tgt_lab = cv2.cvtColor(target_img, cv2.COLOR_RGB2LAB)
+
+    # 2. Extract the L (Lightness) channels
+    src_l = src_lab[:, :, 0]
+    tgt_l = tgt_lab[:, :, 0]
+
+    # 3. Get pixels from source L-channel where mask is active
+    # Ensure mask is single-channel and same size as src_img
+    if len(mask.shape) == 3:
+        mask = cv2.cvtColor(mask, cv2.COLOR_RGB2GRAY)
+    print(mask.mean())
+    
+    masked_src_l = src_l[mask < 256//2] # Thresholding at 127 for binary logic
+
+    # 4. Calculate CDFs for the L-channel
+    def get_cdf(data):
+        hist, _ = np.histogram(data.flatten(), 256, [0, 256])
+        cdf = hist.cumsum()
+        return cdf / cdf.max()
+
+    src_cdf = get_cdf(masked_src_l)
+    tgt_cdf = get_cdf(tgt_l)
+
+    # 5. Create Lookup Table (LUT) for Lightness
+    lut = np.zeros(256, dtype=np.uint8)
+    src_ind = 0
+    for tgt_ind in range(256):
+        while src_ind < 255 and src_cdf[src_ind] < tgt_cdf[tgt_ind]:
+            src_ind += 1
+        lut[tgt_ind] = src_ind
+
+    # 6. Apply LUT only to the Target L-channel
+    matched_l = cv2.LUT(tgt_l, lut)
+
+    # 7. Merge the matched L back with original Target A and B channels
+    res_lab = cv2.merge((matched_l, tgt_lab[:, :, 1], tgt_lab[:, :, 2]))
+
+    # 8. Convert back to BGR for display/saving
+    result_bgr = cv2.cvtColor(res_lab, cv2.COLOR_LAB2BGR)
+    
+    return result_bgr
+
 if __name__ == '__main__':
     import wandb
     log_test = False
@@ -246,10 +298,9 @@ if __name__ == '__main__':
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     print("Using device: {}".format(device))
     config.device = device
-    gt_file = '../data/qual_tests/4_clean.png'
-    mask_file = '../data/dtd/images/grooved/grooved_0061.jpg'
-    
-    os.makedirs(f"outputs/{CKPT.split('/')[-1].split('.')[0]}", exist_ok = True)
+    mask_file = args.mask
+    gt_file = args.image
+    os.makedirs(f"outputs/{CKPT.split('/')[-1].split('.')[0]}_v4", exist_ok = True)
     # masked_file = '../raindrop_data/test_a/data/0_rain.png'
     # mask_file = '../raindrop_data/test_a/mask/2a5a6ce95109caba13b6c840ed22638f.png'
     # masked_img = Image.open(masked_file).convert('RGB')
@@ -259,14 +310,19 @@ if __name__ == '__main__':
 
     gt_img = Image.open(gt_file).convert('RGB')
     new_width, new_height = gt_img.size
-    mask_img = Image.open(mask_file).convert('L').resize((new_width, new_height), resample=Image.LANCZOS)
+    mask_img = Image.open(mask_file).convert('L').resize((new_width, new_height), resample=Image.NEAREST)
     masked_tensor = get_masked_image(gt_img, mask_img)
     
-    to_pil_image(masked_tensor.squeeze().cpu()).save(f"outputs/{CKPT.split('/')[-1].split('.')[0]}_v3/{mask_file.split('/')[-1]}")
+    masked_img = to_pil_image(masked_tensor.squeeze().cpu())
+    masked_img.save(f"outputs/{CKPT.split('/')[-1].split('.')[0]}_v4/{mask_file.split('/')[-1]}")
     
     mask_tensor = to_tensor(mask_img)
     # torch.cat([masked_tensor,mask_tensor], dim = 0), , mask_tensor
     result = main(masked_tensor.clone(), masked_tensor.clone(), mask_tensor.clone())
+    result.save(f"outputs/{CKPT.split('/')[-1].split('.')[0]}_v4/r64_{gt_file.split('/')[-1]}")
+    result = color_region_match(np.array(masked_img), np.array(mask_img), np.array(result))
+    # Save the result to a specific path
+    cv2.imwrite(f"outputs/{CKPT.split('/')[-1].split('.')[0]}_v4/equalized_output.png", result)
     # print(result.shape, result.min(), result.max())
-    # result = to_pil_image(result.squeeze().cpu())
-    result.save(f"outputs/{CKPT.split('/')[-1].split('.')[0]}_v3/r32_{gt_file.split('/')[-1]}")
+    
+    
